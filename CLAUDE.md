@@ -136,7 +136,10 @@ explains *why* a neighborhood has that score using retrieved review text.
 - All API keys live in `.env` only — never hardcoded, never committed
 - Commit message format: `type: description` (types: `chore`, `feat`, `fix`, `docs`)
 - Branch `poc` is the working branch until April 29 — do not merge to `main` until PoC is complete
-- After each sprint: update the "Current Status" section above
+- At the end of every sprint, before committing: 
+1. Update ARCHITECTURE.md with every file built or modified — what it does, what it exports, how it connects to other modules
+2. Update the Current Status section in CLAUDE.md with the completed sprint and next sprint
+3. Update the Change Log table with date, sprint, change, and rationale
 
 ---
 
