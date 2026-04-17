@@ -122,9 +122,9 @@ explains *why* a neighborhood has that score using retrieved review text.
 
 ## Current Status
 - **Branch**: `poc`
-- **Sprint**: 1 (starting)
-- **Completed (Sprint 0)**: repo initialized, `NoiseSource` ABC + `NeighborhoodScore` dataclass, all 7 source stubs registered in `ALL_SOURCES`, score engine, pipeline orchestrator, `requirements.txt`, `.env.example`, Supabase schema (`migrations/001_initial_schema.sql`), Miami neighborhood GeoJSON (106 polygons), `ARCHITECTURE.md`
-- **Next**: implement `complaints_311.fetch()` and `venue_density.fetch()`, seed `neighborhoods` table from GeoJSON, run pipeline and store first real scores in Supabase
+- **Sprint**: 2 (starting)
+- **Completed (Sprint 1)**: `ingestion/db.py` (Supabase client, seed_neighborhoods, write_scores, centroid/GDF loaders), `complaints_311.fetch()` (ArcGIS REST + geopandas spatial join + max-normalization), `venue_density.fetch()` (Google Places Nearby Search + per-neighborhood circumradius in UTM 17N + max-normalization), `run_and_persist()` + `__main__` in pipeline.py, `SUPABASE_SERVICE_KEY` in `.env.example`
+- **Next**: implement `yelp_reviews.fetch()` and `reddit_posts.fetch()` (RAG corpus text), embed review chunks with OpenAI text-embedding-3-small, store in Supabase `embeddings` table, build RAG retrieval function and LLM synthesis to generate neighborhood profiles
 
 > Update this section at the end of every sprint.
 
@@ -153,6 +153,11 @@ explains *why* a neighborhood has that score using retrieved review text.
 | Apr 17, 2026 | 0 | `migrations/001_initial_schema.sql` — Supabase DDL | Defines neighborhoods, noise_scores, reviews, embeddings tables + RLS + pgvector index |
 | Apr 17, 2026 | 0 | `data/geojson/miami_neighborhoods.geojson` — 106 polygons | City of Miami ArcGIS Hub; seeds `neighborhoods` table and drives the Folium choropleth |
 | Apr 17, 2026 | 0 | `requirements.txt`, `.env.example`, `ARCHITECTURE.md` | Dependency pinning, credential documentation, and module-level architecture reference |
+| Apr 17, 2026 | 1 | `ingestion/db.py` — Supabase I/O layer | Centralizes all DB reads/writes so sources never construct clients directly |
+| Apr 17, 2026 | 1 | `complaints_311.fetch()` — ArcGIS REST + spatial join | Miami-Dade portal migrated from Socrata to ArcGIS; geopandas sjoin assigns complaints to polygons |
+| Apr 17, 2026 | 1 | `venue_density.fetch()` — Google Places + per-neighborhood radius | Per-neighborhood circumradius (UTM 17N, capped 1500m) chosen over fixed 800m due to Miami's uneven neighborhood sizes |
+| Apr 17, 2026 | 1 | `run_and_persist()` + `__main__` in pipeline.py | Keeps `run_pipeline()` pure/testable; persistence is a separate entry point |
+| Apr 17, 2026 | 1 | `SUPABASE_SERVICE_KEY` added to `.env.example` | Anon key is read-only (RLS); service role key required for ingestion writes |
 
 ---
 

@@ -241,20 +241,150 @@ Initial Supabase DDL. Run once via the Supabase SQL editor or `supabase db push`
 
 ---
 
+## Sprint 1 — Data Ingestion + Score Persistence
+
+### `ingestion/db.py`
+
+Supabase I/O layer for the ingestion pipeline. Sources and the pipeline never
+construct a Supabase client directly — they import from here.
+
+**Exports:**
+
+- `get_client()` — reads `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`, returns a
+  `supabase.Client`. Service role key is required to bypass RLS for writes.
+
+- `seed_neighborhoods() → int` — reads `data/geojson/miami_neighborhoods.geojson`,
+  computes each polygon's centroid via shapely, and upserts all 106 rows into
+  `neighborhoods` (conflict on `slug`). Idempotent — safe to call on every run.
+
+- `write_scores(composite, per_source) → str` — generates a `run_id` UUID,
+  resolves neighborhood UUIDs from the DB (one `SELECT` round-trip), then bulk-inserts
+  rows into `noise_scores` with `composite_score` and `source_scores` JSONB.
+  Returns the `run_id` string.
+
+- `load_neighborhood_centroids() → dict[str, tuple[float, float]]` — reads GeoJSON
+  locally (no DB round-trip), returns `name → (lat, lon)`. Used by `VenueDensity`
+  to avoid a DB dependency during source execution.
+
+- `load_neighborhood_geodataframe() → GeoDataFrame` — reads GeoJSON as a WGS84
+  GeoDataFrame. Used by `Complaints311` for spatial joins and by `VenueDensity`
+  for circumradius computation.
+
+**Connects to:** `ingestion/pipeline.py` (called by `run_and_persist()`),
+`ingestion/sources/complaints_311.py` (calls `load_neighborhood_geodataframe()`),
+`ingestion/sources/venue_density.py` (calls `load_neighborhood_centroids()` and
+`load_neighborhood_geodataframe()`).
+
+---
+
+### `ingestion/sources/complaints_311.py` (implemented)
+
+**Class:** `Complaints311` — `source_id="complaints_311"`, `weight=0.5`
+
+Fetches Miami-Dade 311 noise complaints from the ArcGIS Feature Service
+(`data_311_2022`) and computes a complaint-density score per neighborhood.
+
+**`fetch()` steps:**
+1. Load neighborhood polygons via `db.load_neighborhood_geodataframe()`.
+2. Query ArcGIS REST endpoint (`FEATURE_SERVICE_URL`) with `where=issue_type LIKE '%NOISE%'`,
+   paginating in 2000-record pages until `exceededTransferLimit` is false.
+3. Drop records with null or non-numeric lat/lon.
+4. Build a `GeoDataFrame` of complaint points (WGS84).
+5. `gpd.sjoin(complaints, neighborhoods, predicate="within")` — spatial join.
+6. `.groupby("name").size()` reindexed to all 106 neighborhoods (zeros for missing).
+7. Max-normalize: `score = count / max_count`.
+8. Return `list[NeighborhoodScore]` with `metadata={"raw_count": int}`.
+
+**Env vars:** none required; `MIAMI_DATA_APP_TOKEN` optional (rate limit header).
+
+**Connects to:** `ingestion/db.py` (`load_neighborhood_geodataframe()`),
+`ingestion/sources/base.py` (inherits `NoiseSource`).
+
+---
+
+### `ingestion/sources/venue_density.py` (implemented)
+
+**Class:** `VenueDensity` — `source_id="venue_density"`, `weight=0.5`
+
+Counts nightlife venues near each neighborhood centroid using the Google Places
+Nearby Search API and computes a venue-density score per neighborhood.
+
+**`fetch()` steps:**
+1. Load centroids via `db.load_neighborhood_centroids()` (name → (lat, lon)).
+2. Compute per-neighborhood search radius via `_compute_radii()` (see below).
+3. For each neighborhood, call `_count_places()` three times: `bar`, `night_club`, `restaurant`.
+4. Sum venue counts. Max-normalize across all neighborhoods.
+5. Return `list[NeighborhoodScore]` with `metadata={bar_count, club_count, restaurant_count, total}`.
+
+**`_compute_radii()`:** Reprojects GeoJSON to UTM Zone 17N (EPSG:32617, meters),
+computes each polygon's circumradius (max centroid-to-vertex distance), clips to
+1500m upper bound. Miami neighborhoods range from ~300m (Brickell Key) to ~1.5km
+(Allapattah) — per-neighborhood radii avoid over/undercounting.
+
+**`_count_places()`:** Up to 3 pages per type (60 results max). Waits 2s between
+paginated requests per Google's `next_page_token` requirement.
+
+**Env vars:** `GOOGLE_PLACES_API_KEY`.
+
+**Connects to:** `ingestion/db.py` (`load_neighborhood_centroids()`,
+`load_neighborhood_geodataframe()`), `ingestion/sources/base.py`.
+
+---
+
+### `ingestion/pipeline.py` (updated)
+
+Added three things to the Sprint 0 skeleton:
+
+- `_fetch_results(active) → dict[str, list[NeighborhoodScore]]` — extracted from
+  `run_pipeline()` so both `run_pipeline()` and `run_and_persist()` share the same
+  fetch loop without duplication.
+
+- `run_and_persist() → dict[str, float]` — full pipeline run with Supabase
+  persistence. Seeds neighborhoods, fetches from active sources, computes scores,
+  writes to `noise_scores`. Imports `ingestion.db` locally to keep `run_pipeline()`
+  free of DB dependencies for testing.
+
+- `__main__` block — `python -m ingestion.pipeline` seeds neighborhoods, runs all
+  available sources, writes scores, and prints the top 10 noisiest neighborhoods.
+
+`run_pipeline()` is **unchanged** — still pure computation, no DB side effects.
+
+**Connects to:** `ingestion/db.py` (inside `run_and_persist()`),
+`ingestion/sources/__init__.py` (`ALL_SOURCES`), `ingestion/score_engine.py`.
+
+---
+
+### `.env.example` (updated)
+
+Added `SUPABASE_SERVICE_KEY` alongside the existing `SUPABASE_KEY`:
+- `SUPABASE_KEY` — anon key for public reads (frontend)
+- `SUPABASE_SERVICE_KEY` — service role key for backend writes (bypasses RLS)
+
+---
+
 ## Module Dependency Map
 
 ```
 pipeline.py
-  └── sources/__init__.py  →  ALL_SOURCES
-        ├── complaints_311.py   ──┐
-        ├── venue_density.py     │
-        ├── yelp_reviews.py      │  all inherit from
-        ├── reddit_posts.py      ├── sources/base.py
-        ├── tomtom_traffic.py    │    (NoiseSource, NeighborhoodScore)
-        ├── opensky_flights.py   │
-        └── construction.py    ──┘
-  └── score_engine.py
-        └── sources/base.py  (NeighborhoodScore, NoiseSource types)
+  ├── run_pipeline() ──────────────────────────────────────────────────────────┐
+  │     └── sources/__init__.py  →  ALL_SOURCES                                │
+  │           ├── complaints_311.py ──┐                                        │
+  │           ├── venue_density.py   │  inherit NoiseSource / NeighborhoodScore│
+  │           ├── yelp_reviews.py    ├── sources/base.py                       │
+  │           ├── reddit_posts.py    │                                         │
+  │           ├── tomtom_traffic.py  │                                         │
+  │           ├── opensky_flights.py │                                         │
+  │           └── construction.py ──┘                                         │
+  │     └── score_engine.py                                                    │
+  │                                                                            │
+  └── run_and_persist() ─────────────────────────────────────────────────────┘
+        └── db.py
+              ├── seed_neighborhoods() ← data/geojson/miami_neighborhoods.geojson
+              └── write_scores()       → Supabase noise_scores table
+
+complaints_311.py  → db.load_neighborhood_geodataframe()
+venue_density.py   → db.load_neighborhood_centroids()
+                   → db.load_neighborhood_geodataframe()  (for radii)
 ```
 
 ---
