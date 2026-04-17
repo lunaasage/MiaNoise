@@ -11,16 +11,27 @@ import logging
 
 from ingestion.score_engine import compute_composite_scores
 from ingestion.sources import ALL_SOURCES
+from ingestion.sources.base import NeighborhoodScore, NoiseSource
 
 logger = logging.getLogger(__name__)
 
 
+def _fetch_results(
+    active: list[NoiseSource],
+) -> dict[str, list[NeighborhoodScore]]:
+    results: dict[str, list[NeighborhoodScore]] = {}
+    for source in active:
+        readings = source.fetch_safe()
+        if readings is not None:
+            results[source.source_id] = readings
+    return results
+
+
 def run_pipeline() -> dict[str, float]:
     """
-    Run the full ingestion pipeline.
-
-    Returns:
-        neighborhood → composite noise score in [0.0, 1.0]
+    Run the ingestion pipeline without any DB writes.
+    Returns neighborhood → composite score (0–1).
+    Safe to call in tests and scripts that don't need persistence.
     """
     sources = [cls() for cls in ALL_SOURCES]
     active = [s for s in sources if s.is_available()]
@@ -30,11 +41,56 @@ def run_pipeline() -> dict[str, float]:
         return {}
 
     logger.info("Active sources: %s", [s.source_id for s in active])
-
-    results: dict = {}
-    for source in active:
-        readings = source.fetch_safe()
-        if readings is not None:
-            results[source.source_id] = readings
-
+    results = _fetch_results(active)
     return compute_composite_scores(results, active)
+
+
+def run_and_persist() -> dict[str, float]:
+    """
+    Full pipeline run with Supabase persistence.
+
+    Steps:
+      1. Seed neighborhoods table from GeoJSON (idempotent upsert)
+      2. Fetch from all available sources
+      3. Compute composite scores
+      4. Write scores to noise_scores table
+      5. Return composite scores
+
+    Requires SUPABASE_URL and SUPABASE_SERVICE_KEY in the environment.
+    """
+    from ingestion import db
+
+    db.seed_neighborhoods()
+
+    sources = [cls() for cls in ALL_SOURCES]
+    active = [s for s in sources if s.is_available()]
+
+    if not active:
+        logger.warning("No sources available — check your .env")
+        return {}
+
+    logger.info("Active sources: %s", [s.source_id for s in active])
+    results = _fetch_results(active)
+    composite = compute_composite_scores(results, active)
+
+    per_source = {
+        source_id: {r.neighborhood: r.normalized_score for r in readings}
+        for source_id, readings in results.items()
+    }
+    db.write_scores(composite, per_source)
+    return composite
+
+
+if __name__ == "__main__":
+    import logging
+    from dotenv import load_dotenv
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    )
+    load_dotenv()
+    scores = run_and_persist()
+    print(f"\nTop 10 noisiest neighborhoods:")
+    for name, score in sorted(scores.items(), key=lambda x: -x[1])[:10]:
+        print(f"  {score:.3f}  {name}")
