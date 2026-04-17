@@ -122,9 +122,9 @@ explains *why* a neighborhood has that score using retrieved review text.
 
 ## Current Status
 - **Branch**: `poc`
-- **Sprint**: 0
-- **Completed**: repo initialized, folder structure created, CLAUDE.md written
-- **Next**: build `NoiseSource` base class, scaffold all source stubs, define Supabase schema
+- **Sprint**: 1 (starting)
+- **Completed (Sprint 0)**: repo initialized, `NoiseSource` ABC + `NeighborhoodScore` dataclass, all 7 source stubs registered in `ALL_SOURCES`, score engine, pipeline orchestrator, `requirements.txt`, `.env.example`, Supabase schema (`migrations/001_initial_schema.sql`), Miami neighborhood GeoJSON (106 polygons), `ARCHITECTURE.md`
+- **Next**: implement `complaints_311.fetch()` and `venue_density.fetch()`, seed `neighborhoods` table from GeoJSON, run pipeline and store first real scores in Supabase
 
 > Update this section at the end of every sprint.
 
@@ -147,6 +147,12 @@ explains *why* a neighborhood has that score using retrieved review text.
 | Date | Sprint | Change | Rationale |
 |---|---|---|---|
 | Apr 17, 2026 | 0 | Initialized repo structure + CLAUDE.md | Foundation before any pipeline code |
+| Apr 17, 2026 | 0 | `NoiseSource` ABC, `NeighborhoodScore`, all 7 source stubs, `ALL_SOURCES` registry | Plugin architecture so PoC and full version share one codebase with no branching logic |
+| Apr 17, 2026 | 0 | `score_engine.py` — weighted composite score computation | Separates score math from orchestration; zero-weight sources skip numeric score cleanly |
+| Apr 17, 2026 | 0 | `pipeline.py` — registry-driven orchestrator | Discovers sources via `ALL_SOURCES`; adding a source never requires touching this file |
+| Apr 17, 2026 | 0 | `migrations/001_initial_schema.sql` — Supabase DDL | Defines neighborhoods, noise_scores, reviews, embeddings tables + RLS + pgvector index |
+| Apr 17, 2026 | 0 | `data/geojson/miami_neighborhoods.geojson` — 106 polygons | City of Miami ArcGIS Hub; seeds `neighborhoods` table and drives the Folium choropleth |
+| Apr 17, 2026 | 0 | `requirements.txt`, `.env.example`, `ARCHITECTURE.md` | Dependency pinning, credential documentation, and module-level architecture reference |
 
 ---
 

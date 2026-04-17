@@ -208,6 +208,39 @@ credentials before running.
 
 ---
 
+### `migrations/001_initial_schema.sql`
+
+Initial Supabase DDL. Run once via the Supabase SQL editor or `supabase db push`.
+
+**Enables extensions:** `uuid-ossp`, `vector` (pgvector), `postgis`.
+
+**Creates four tables:**
+
+| Table | Purpose |
+|---|---|
+| `neighborhoods` | One row per Miami neighborhood. Stores name, slug, PostGIS `boundary` polygon (EPSG:4326), and derived `centroid`. Spatial indexes on both geography columns. |
+| `noise_scores` | One row per neighborhood per pipeline run. Stores `composite_score` (float, 0–1), `source_scores` (JSONB breakdown by source), and `run_id` (UUID grouping all scores from one run). |
+| `reviews` | Raw text corpus for RAG. Populated by `yelp_reviews` and `reddit_posts` sources. Fields: `source`, `content`, `author`, `external_url`, `metadata` (JSONB). |
+| `embeddings` | Chunked review text with 1536-dim pgvector embeddings (OpenAI text-embedding-3-small). IVFFlat index (`lists=100`) for approximate cosine similarity search. `neighborhood_id` is denormalized here for fast filtered retrieval. |
+
+**Creates one view:** `latest_noise_scores` — `DISTINCT ON (neighborhood_id)` ordered by `computed_at DESC`, joined with neighborhood name/slug. Used by the UI and agent.
+
+**RLS:** All four tables have Row Level Security enabled. Public anon key gets `SELECT` only; writes require the service role key (backend pipeline).
+
+**Connects to:** `ingestion/pipeline.py` (writes `noise_scores`), `rag/` (reads/writes `reviews` and `embeddings`), `ui/app.py` (reads `latest_noise_scores` view).
+
+---
+
+### `data/geojson/miami_neighborhoods.geojson`
+
+106 Miami neighborhood polygons sourced from the City of Miami ArcGIS Hub (EPSG:4326). All features are `Polygon` type. Each feature has a `name` property (e.g. `"Wynwood Industrial District"`) used to join against the `neighborhoods` table.
+
+**Loaded at:** first pipeline run to seed the `neighborhoods` table (Sprint 1).
+
+**Connects to:** `ingestion/pipeline.py` (reads boundaries to seed DB), `ui/app.py` (renders choropleth overlay on Folium map), `migrations/001_initial_schema.sql` (`neighborhoods.boundary` column stores these geometries).
+
+---
+
 ## Module Dependency Map
 
 ```
