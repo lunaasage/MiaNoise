@@ -39,19 +39,25 @@ def seed_neighborhoods() -> int:
     gdf = gpd.read_file(GEOJSON_PATH).to_crs("EPSG:4326")
     client = get_client()
 
+    seen: set[str] = set()
     rows = []
     for _, row in gdf.iterrows():
         poly = row.geometry
         centroid = poly.centroid
+        slug = _slug(row["name"])
+        if slug in seen:
+            logger.warning("Duplicate slug %r (name=%r) — skipping", slug, row["name"])
+            continue
+        seen.add(slug)
         rows.append({
             "name": row["name"],
-            "slug": _slug(row["name"]),
+            "slug": slug,
             "boundary": poly.wkt,
             "centroid": f"POINT({centroid.x} {centroid.y})",
         })
 
     client.table("neighborhoods").upsert(rows, on_conflict="slug").execute()
-    logger.info("Seeded %d neighborhoods", len(rows))
+    logger.info("Seeded %d neighborhoods (%d duplicates dropped)", len(rows), len(gdf) - len(rows))
     return len(rows)
 
 
