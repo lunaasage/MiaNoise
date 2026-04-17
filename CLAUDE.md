@@ -137,9 +137,9 @@ explains *why* a neighborhood has that score using retrieved review text.
 - Commit message format: `type: description` (types: `chore`, `feat`, `fix`, `docs`)
 - Branch `poc` is the working branch until April 29 — do not merge to `main` until PoC is complete
 - At the end of every sprint, before committing: 
-1. Update ARCHITECTURE.md with every file built or modified — what it does, what it exports, how it connects to other modules
-2. Update the Current Status section in CLAUDE.md with the completed sprint and next sprint
-3. Update the Change Log table with date, sprint, change, and rationale
+    1. Update ARCHITECTURE.md with every file built or modified — what it does, what it exports, how it connects to other modules
+    2. Update the Current Status section in CLAUDE.md with the completed sprint and next sprint
+    3. Update the Change Log table with date, sprint, change, and rationale
 
 ---
 
