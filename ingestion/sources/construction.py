@@ -8,6 +8,9 @@ class ConstructionPermits(NoiseSource):
     weight = 0.15  # placeholder — calibrate once all full-version sources are active
     required_env_vars = []  # Miami Open Data is public
 
+    def is_available(self) -> bool:
+        return False  # full version only — not implemented for PoC
+
     def fetch(self) -> list[NeighborhoodScore]:
         # Full version: query Miami Building Department permit dataset, filter for active
         # permits with work type that generates noise (demolition, excavation, framing),
