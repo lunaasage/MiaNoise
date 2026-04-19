@@ -24,10 +24,20 @@ PAGE_SIZE = 2000
 
 
 class Complaints311(NoiseSource):
-    """Miami-Dade Code Compliance — open noise regulation violations per neighborhood."""
+    """
+    Miami-Dade Code Compliance — open noise regulation violations.
+
+    Weight is 0.0 for the PoC: the open violations dataset covers south
+    Miami-Dade (lat 25.51–25.72) while our neighborhood GeoJSON covers the
+    City of Miami (lat ~25.73–25.85). Geographic mismatch means the spatial
+    join finds 0 violations for virtually every neighborhood.
+
+    The fetch() still runs so violations can feed the RAG corpus as context.
+    Replace with a City of Miami noise complaint source in the full version.
+    """
 
     source_id = "complaints_311"
-    weight = 0.5
+    weight = 0.0  # RAG corpus only — geographic mismatch with PoC neighborhoods
     required_env_vars = []  # public dataset — no key required
 
     def fetch(self) -> list[NeighborhoodScore]:

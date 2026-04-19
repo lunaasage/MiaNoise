@@ -10,22 +10,25 @@ from .base import NeighborhoodScore, NoiseSource
 
 logger = logging.getLogger(__name__)
 
-PLACES_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+# Google Places API (New) — Nearby Search
+# The legacy Nearby Search API (maps.googleapis.com/maps/api/place/nearbysearch)
+# requires a separate enablement; new projects default to the v1 API.
+PLACES_URL = "https://places.googleapis.com/v1/places:searchNearby"
 VENUE_TYPES = ["bar", "night_club", "restaurant"]
 MAX_RADIUS_M = 1500  # upper bound for large neighborhoods like Allapattah
 
 
 class VenueDensity(NoiseSource):
-    """Google Places API — nightlife venue density per neighborhood."""
+    """Google Places API (New) — nightlife venue density per neighborhood."""
 
     source_id = "venue_density"
-    weight = 0.5
+    weight = 1.0  # sole scoring source for PoC (complaints data geographically mismatched)
     required_env_vars = ["GOOGLE_PLACES_API_KEY"]
 
     def fetch(self) -> list[NeighborhoodScore]:
         api_key = os.environ["GOOGLE_PLACES_API_KEY"]
-        centroids = load_neighborhood_centroids()         # name → (lat, lon)
-        radii = self._compute_radii()                     # name → radius_m
+        centroids = load_neighborhood_centroids()
+        radii = self._compute_radii()
 
         counts: dict[str, dict] = {}
         for name, (lat, lon) in centroids.items():
@@ -45,6 +48,12 @@ class VenueDensity(NoiseSource):
         totals = {name: c["total"] for name, c in counts.items()}
         max_total = max(totals.values(), default=1) or 1
 
+        logger.info(
+            "venue_density: max=%d venues, mean=%.1f, non-zero neighborhoods=%d",
+            max_total,
+            sum(totals.values()) / len(totals) if totals else 0,
+            sum(1 for v in totals.values() if v > 0),
+        )
         return [
             NeighborhoodScore(
                 neighborhood=name,
@@ -59,9 +68,9 @@ class VenueDensity(NoiseSource):
     @staticmethod
     def _compute_radii() -> dict[str, int]:
         """
-        Per-neighborhood search radius in meters = polygon circumradius, capped at
-        MAX_RADIUS_M. Projected to UTM Zone 17N (EPSG:32617) for metric accuracy.
-        Miami neighborhoods range from ~300m (Brickell Key) to ~1.5km (Allapattah).
+        Per-neighborhood search radius = polygon circumradius (UTM Zone 17N), capped at
+        MAX_RADIUS_M. Avoids over-counting in small dense neighborhoods (Brickell Key
+        ~300m) and under-counting in large ones (Allapattah ~1.5km).
         """
         gdf = load_neighborhood_geodataframe().to_crs("EPSG:32617")
         radii = {}
@@ -79,19 +88,31 @@ class VenueDensity(NoiseSource):
         lat: float, lon: float, radius_m: int, place_type: str, api_key: str
     ) -> int:
         """
-        Count Places of a given type within radius_m of (lat, lon).
-        Paginates up to 3 pages (60 results max per the Places API).
+        Count Places of a given type within radius_m of (lat, lon) using the
+        Places API (New). Paginates up to 3 pages (60 results max).
         """
         count = 0
-        params = {
-            "location": f"{lat},{lon}",
-            "radius": radius_m,
-            "type": place_type,
-            "key": api_key,
+        body: dict = {
+            "includedTypes": [place_type],
+            "maxResultCount": 20,
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": lat, "longitude": lon},
+                    "radius": float(radius_m),
+                }
+            },
         }
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.id",  # nextPageToken is returned automatically
+        }
+
         for page in range(3):
             try:
-                resp = requests.get(PLACES_URL, params=params, timeout=10)
+                resp = requests.post(
+                    PLACES_URL, json=body, headers=headers, timeout=10
+                )
                 resp.raise_for_status()
                 data = resp.json()
             except Exception as exc:
@@ -100,12 +121,13 @@ class VenueDensity(NoiseSource):
                 )
                 break
 
-            count += len(data.get("results", []))
-            token = data.get("next_page_token")
+            places = data.get("places", [])
+            count += len(places)
+
+            token = data.get("nextPageToken")
             if not token:
                 break
-            # Google requires ~2s before next_page_token is valid
+            body = {"pageToken": token}
             time.sleep(2)
-            params = {"pagetoken": token, "key": api_key}
 
         return count
