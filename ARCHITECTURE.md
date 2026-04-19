@@ -429,11 +429,96 @@ venue_density.py   → db.load_neighborhood_centroids()
 
 ---
 
+---
+
+## Sprint 2 — RAG Pipeline
+
+### `ingestion/sources/base.py` (updated)
+
+Added `CorpusDocument` dataclass alongside `NeighborhoodScore`:
+
+- `CorpusDocument` — fields: `neighborhood`, `source_id`, `content` (raw text), `author`, `external_url`, `metadata`. Returned by corpus sources instead of `NeighborhoodScore`.
+- `fetch()` return type updated to `list[NeighborhoodScore] | list[CorpusDocument]`.
+- `source_role` ClassVar (`"scoring"` | `"corpus"` | `"both"`) routes pipeline output.
+
+---
+
+### `ingestion/sources/google_places_reviews.py`
+
+**Class:** `GooglePlacesReviews` — `source_id="google_places"`, `source_role="corpus"`
+
+Primary corpus source for the RAG pipeline. Fetches review text for bars, nightclubs, and restaurants near each neighborhood with OSM-mapped venues.
+
+**`fetch()` steps:**
+1. Load OSM venue cache to identify the 59 neighborhoods with venues (avoids querying all 104).
+2. For each neighborhood, search Google Places API (New) for `bar`, `night_club`, `restaurant` within UTM circumradius (capped 1500m).
+3. For each place, collect up to 5 reviews. Prepend `[Venue Name, Neighborhood]` to each review for geographic anchoring in the embedding space.
+4. Return `list[CorpusDocument]`.
+
+**Result:** 10,095 review documents across 58 neighborhoods. Average noise keyword hit rate 63%.
+
+**Env vars:** `GOOGLE_PLACES_API_KEY`.
+
+---
+
+### `ingestion/db.py` (updated)
+
+Added `write_corpus(documents: list[CorpusDocument]) → int` — resolves neighborhood UUIDs, bulk-inserts into the `reviews` table. Returns rows written.
+
+---
+
+### `ingestion/pipeline.py` (updated)
+
+Added `_fetch_corpus(active) → list[CorpusDocument]` alongside `_fetch_results`. `run_and_persist()` now calls `db.write_corpus()` after fetching corpus sources.
+
+---
+
+### `migrations/002_match_embeddings_rpc.sql`
+
+Defines `match_embeddings(query_embedding, match_neighborhood_id, match_count)` — pgvector cosine similarity function called by `rag/retriever.py` via Supabase RPC. Filters by `neighborhood_id` before ranking so results are always geographically scoped.
+
+---
+
+### `rag/embedder.py`
+
+**Entry points:** `embed_all()`, `embed_neighborhood(name)`
+
+Embeds review text with OpenAI `text-embedding-3-small` (1536 dims). Strategy: one review = one chunk. Reviews are already short (50–300 words); splitting further would break sentence coherence and lose venue context already prepended by the corpus source.
+
+Paginates Supabase queries (1000 rows/page) for both the already-embedded ID set and the reviews table. Idempotent — skips reviews already in the embeddings table.
+
+**Connects to:** `ingestion/db.py` (Supabase client), OpenAI API.
+
+---
+
+### `rag/retriever.py`
+
+**Entry points:** `retrieve(neighborhood, query, top_k)`, `retrieve_multi_query(neighborhood, queries, top_k_per_query)`
+
+Embeds the query with the same model used at indexing time, then calls `match_embeddings()` RPC for neighborhood-filtered cosine similarity search. `retrieve_multi_query` runs multiple queries (noise at night, loud music, quiet daytime, etc.) and merges results with deduplication by exact chunk text.
+
+**Connects to:** `ingestion/db.py`, OpenAI API, Supabase RPC.
+
+---
+
+### `rag/synthesizer.py`
+
+**Entry point:** `generate_profile(neighborhood_name) → str`
+
+Loads latest composite + per-source scores from `latest_noise_scores` view, retrieves top chunks via `retrieve_multi_query`, and calls OpenAI GPT-4o-mini with a grounding prompt that restricts the model to only describing noise patterns supported by the retrieved text or scores.
+
+Returns a 3–5 sentence natural-language noise profile suitable for a renter.
+
+**Model:** `gpt-4o-mini` (OpenAI). Anthropic removed from stack — OpenAI consolidates embeddings and synthesis under one provider at lower cost.
+
+**Connects to:** `ingestion/db.py`, `rag/retriever.py`, OpenAI API.
+
+---
+
 ## Modules Stubbed — Not Yet Implemented
 
 | Path | Sprint | Purpose |
 |---|---|---|
-| `rag/` | 2 | Embedding pipeline, pgvector retrieval, profile synthesis |
-| `agent/` | 3 | LangChain AgentExecutor + tools |
+| `agent/` | 3 | LangChain AgentExecutor + Groq tools |
 | `ui/app.py` | 3 | Streamlit app, Folium map, chat interface |
 | `eval/` | 4 | RAGAS evaluation framework |

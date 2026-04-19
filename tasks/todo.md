@@ -50,23 +50,38 @@
 - venue_density → `source_role="corpus"`, `is_available()=False` hack removed
 - yelp_reviews, reddit_posts → `source_role="corpus"` (already weight=0, now explicit)
 
+---
+
+## Sprint 3 — Conversational Agent + UI [CURRENT]
+
+**Goal:** Live Streamlit app with Folium map + chat interface. User can click a neighborhood to read a pre-generated profile, or type a natural-language query ("find me a quiet neighborhood") and get a grounded answer from the Groq agent.
+
+### Tasks
+
+- [ ] **3.1** Pre-generate profiles at pipeline time — run synthesizer for all 59 neighborhoods with venues, store `profile_text` in Supabase (new column or table)
+- [ ] **3.2** Build LangChain agent with Groq (Llama 3.1 70B) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews`
+- [ ] **3.3** Streamlit UI — Folium choropleth map, click-to-profile (reads from DB), chat interface (calls agent)
+- [ ] **3.4** End-to-end test — "find me a quiet neighborhood" returns ranked list with profiles; map click shows Wynwood profile
+
+---
+
 ### Open Questions Carried Forward
 - The UserWarning from `gpd.overlay` ("2684 dropped geometries of different geometry types") on osm_roads — likely MultiLineString/Point artifacts from intersection. Low priority but worth investigating before full version.
 
 ---
 
-## Sprint 2 — RAG Pipeline [CURRENT]
+## Sprint 2 — RAG Pipeline [DONE ✓ confirmed Apr 19]
 
 **Goal:** Given a neighborhood name, generate a natural-language noise profile grounded in review text.
 
 ### Tasks
 
-- [ ] **2.1** Implement `yelp_reviews.fetch()` — pull review text for bars/nightclubs/restaurants near each neighborhood; store in `reviews` table
-- [ ] **2.2** Implement `reddit_posts.fetch()` — search r/miami, r/MiamiBeach for noise-related posts; store in `reviews` table
-- [ ] **2.3** Chunking + embedding — ~512-token chunks, embed with `text-embedding-3-small`, store in `embeddings` table
-- [ ] **2.4** Retrieval function — given neighborhood + query, top-k chunks via pgvector cosine similarity
-- [ ] **2.5** Profile synthesis — claude-sonnet + retrieved chunks + composite score → neighborhood noise narrative
-- [ ] **2.6** End-to-end test — run for Wynwood, verify output matches North Star
+- [x] **2.1** `google_places_reviews.fetch()` — 10,095 reviews across 58 neighborhoods → reviews table
+- [x] **2.2** Reddit/Yelp dropped (see direction change below)
+- [x] **2.3** Embedding — one review = one chunk, text-embedding-3-small, embeddings table (10,095 rows, no duplicates)
+- [x] **2.4** Retrieval — pgvector cosine similarity via match_embeddings() RPC, multi-query merge
+- [x] **2.5** Profile synthesis — GPT-4o-mini (replaced claude-sonnet; see direction change below)
+- [x] **2.6** End-to-end test — Wynwood Industrial District profile verified, retrieval semantically correct
 
 ### Direction Change — Corpus Sources (confirmed Apr 19)
 

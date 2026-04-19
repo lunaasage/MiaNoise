@@ -124,23 +124,27 @@ explains *why* a neighborhood has that score using retrieved review text.
 ## Current Status
 - **Branch**: `poc`
 - **Sprint 1**: DONE ✓ (confirmed Apr 19) — pipeline runs end-to-end, 104 neighborhoods scored, data in Supabase, Overpass caching in place
-- **Sprint 2**: [CURRENT] — RAG pipeline
-- **Next**: implement `yelp_reviews.fetch()` + `reddit_posts.fetch()`, wire corpus pipeline to `db.write_corpus()`, embed chunks with OpenAI text-embedding-3-small, build retrieval + LLM synthesis for neighborhood profiles
+- **Sprint 2**: DONE ✓ (confirmed Apr 19) — 10,095 reviews collected, embedded, retrieval working, GPT-4o-mini profiles verified end-to-end
+- **Sprint 3**: [CURRENT] — Conversational agent + UI
+- **Next**: pre-generate profiles at pipeline time (store in DB), build LangChain agent with Groq, wire Streamlit UI (map + chat)
 
 ### Key Files
 | File | Role | Sprint | Notes |
 |---|---|---|---|
-| `ingestion/sources/base.py` | `NoiseSource` ABC, `NeighborhoodScore`, `source_role` | 0 | Sprint 2 corpus sources inherit from this |
-| `ingestion/score_engine.py` | Weighted composite score computation | 0 | Stable — Sprint 2 won't touch |
-| `migrations/001_initial_schema.sql` | Supabase DDL (neighborhoods, noise_scores, reviews, embeddings) | 0 | Sprint 2 writes to reviews + embeddings tables |
+| `ingestion/sources/base.py` | `NoiseSource` ABC, `NeighborhoodScore`, `CorpusDocument`, `source_role` | 0/2 | |
+| `ingestion/score_engine.py` | Weighted composite score computation | 0 | Stable |
+| `migrations/001_initial_schema.sql` | Supabase DDL — neighborhoods, noise_scores, reviews, embeddings | 0 | |
+| `migrations/002_match_embeddings_rpc.sql` | pgvector cosine similarity RPC | 2 | Run in Supabase SQL editor |
 | `data/geojson/miami_neighborhoods.geojson` | 104 neighborhood polygons (WGS84) | 0 | Used by all spatial joins |
-| `ingestion/db.py` | Supabase I/O — seed, write_scores, load GDF/centroids | 1 | Sprint 2 adds write_corpus() here |
-| `ingestion/pipeline.py` | Orchestrator — scoring/corpus split, run_and_persist() | 1 | Sprint 2 wires corpus results to db.write_corpus() |
-| `ingestion/sources/complaints_311.py` | City of Miami 311 NOISEVIO — corpus source | 1 | First corpus source Sprint 2 will persist |
-| `ingestion/sources/osm_venues.py` | OSM venue density — scoring (w=0.6), 1-day cache | 1 | Sprint 2 RAG narratives reference venue counts |
-| `ingestion/sources/osm_roads.py` | OSM weighted road-km — scoring (w=0.4), 7-day cache | 1 | Sprint 2 RAG narratives reference road signal |
-| `ingestion/sources/venue_density.py` | Google Places — corpus, Sprint 2 enrichment | 1 | Activate in Sprint 2 for cross-validation |
-| `tasks/lessons.md` | Sprint lessons log (10 entries from Sprint 1) | 1 | Read at session start |
+| `ingestion/db.py` | Supabase I/O — seed, write_scores, write_corpus, load GDF/centroids | 1/2 | |
+| `ingestion/pipeline.py` | Orchestrator — scoring/corpus split, run_and_persist() | 1/2 | |
+| `ingestion/sources/osm_venues.py` | OSM venue density — scoring (w=0.6), 1-day cache | 1 | |
+| `ingestion/sources/osm_roads.py` | OSM weighted road-km — scoring (w=0.4), 7-day cache | 1 | |
+| `ingestion/sources/google_places_reviews.py` | Google Places review text — primary corpus source | 2 | 10,095 reviews across 58 neighborhoods |
+| `rag/embedder.py` | Batch embed reviews with text-embedding-3-small, idempotent | 2 | |
+| `rag/retriever.py` | pgvector cosine similarity retrieval, multi-query merge | 2 | |
+| `rag/synthesizer.py` | GPT-4o-mini profile generation from retrieved chunks + scores | 2 | |
+| `tasks/lessons.md` | Sprint lessons log (13 entries) | 1/2 | Read at session start |
 
 > NEVER update sprint status or this table without Luna's explicit confirmation (Sprint Completion Protocol above).
 
@@ -204,6 +208,13 @@ This is the record of *why* the codebase looks the way it does. Never silently r
 | Apr 19, 2026 | 1 | Local GeoPackage cache for osm_roads (7d) and osm_venues (1d) | Overpass public endpoints timeout under load; cache makes pipeline reliable regardless of API availability |
 | Apr 19, 2026 | 1 | User-Agent header added to all Overpass requests | overpass-api.de returns 406 without it; silently rejected at gateway with no useful error |
 | Apr 19, 2026 | 1 | `gpd.overlay` argument order fixed (roads as df1, not neighborhoods) | keep_geom_type=True with polygon df1 dropped all LineString clippings → zero scores |
+| Apr 19, 2026 | 2 | `CorpusDocument` dataclass added to `base.py` | Clean return type for corpus sources; separates review text from scoring NeighborhoodScore |
+| Apr 19, 2026 | 2 | `google_places_reviews.py` — 10,095 reviews across 58 neighborhoods | Yelp too expensive, Reddit API inaccessible; Google Places sufficient (63% noise keyword hit rate) |
+| Apr 19, 2026 | 2 | `db.write_corpus()` + pipeline corpus wiring | Reviews persisted to Supabase reviews table; pipeline routes corpus sources through write_corpus() |
+| Apr 19, 2026 | 2 | `rag/embedder.py` — batch embedding with text-embedding-3-small | One review = one chunk; venue/neighborhood prefix embedded for geographic anchoring |
+| Apr 19, 2026 | 2 | `rag/retriever.py` — pgvector cosine similarity via match_embeddings() RPC | Multi-query retrieval merges results across 5 noise-aspect queries, deduplicates |
+| Apr 19, 2026 | 2 | `rag/synthesizer.py` — GPT-4o-mini profile generation | Anthropic removed from stack; OpenAI consolidates embeddings + synthesis under one provider |
+| Apr 19, 2026 | 2 | Live agent switched to Groq (Llama 3.1 70B, free tier) | Per-user Claude API cost eliminated; Groq free tier covers PoC scale (14,400 req/day) |
 
 ---
 
