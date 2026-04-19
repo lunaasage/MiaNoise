@@ -115,6 +115,9 @@ def run_and_persist() -> dict[str, float]:
             len(corpus),
         )
 
+    from rag.synthesizer import generate_all_profiles
+    generate_all_profiles()
+
     return composite
 
 

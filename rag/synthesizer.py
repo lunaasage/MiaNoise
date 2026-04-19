@@ -136,6 +136,55 @@ def generate_profile(neighborhood_name: str) -> str:
     return profile
 
 
+def generate_all_profiles() -> int:
+    """
+    Generate and store profiles for every neighborhood that has embeddings.
+    Called by pipeline.run_and_persist() at the end of each nightly run.
+    Returns number of profiles written.
+    """
+    import time
+    from ingestion.db import write_profile
+
+    db = get_client()
+
+    # Query distinct neighborhood names via reviews table — one row per review,
+    # but we only need unique names. Paginate to avoid the 1000-row default limit.
+    PAGE = 1000
+    seen: set[str] = set()
+    names: list[str] = []
+    offset = 0
+    while True:
+        batch = (
+            db.table("reviews")
+            .select("neighborhood_id, neighborhoods(name)")
+            .range(offset, offset + PAGE - 1)
+            .execute()
+            .data
+        )
+        for row in batch:
+            name = (row.get("neighborhoods") or {}).get("name")
+            if name and name not in seen:
+                seen.add(name)
+                names.append(name)
+        if len(batch) < PAGE:
+            break
+        offset += PAGE
+
+    logger.info("synthesizer: generating profiles for %d neighborhoods", len(names))
+    written = 0
+    for name in names:
+        try:
+            profile = generate_profile(name)
+            write_profile(name, profile, model=MODEL)
+            written += 1
+        except Exception as exc:
+            logger.warning("synthesizer: failed for %r — %s", name, exc)
+        time.sleep(0.5)  # mild throttle — 59 calls, no need to hammer the API
+
+    logger.info("synthesizer: wrote %d profiles", written)
+    return written
+
+
 if __name__ == "__main__":
     import logging
     from dotenv import load_dotenv

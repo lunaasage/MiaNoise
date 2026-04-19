@@ -147,6 +147,32 @@ def write_corpus(documents: list) -> int:
     return len(rows)
 
 
+def write_profile(neighborhood_name: str, profile_text: str, model: str = "gpt-4o-mini") -> None:
+    """Insert a pre-generated profile row. latest_profiles view always returns the most recent."""
+    client = get_client()
+    result = client.table("neighborhoods").select("id").eq("name", neighborhood_name).execute()
+    if not result.data:
+        logger.warning("write_profile: no neighborhood record for %r — skipping", neighborhood_name)
+        return
+    client.table("profiles").insert({
+        "neighborhood_id": result.data[0]["id"],
+        "profile_text": profile_text,
+        "model": model,
+    }).execute()
+
+
+def load_profile(neighborhood_name: str) -> str | None:
+    """Return the latest pre-generated profile text for a neighborhood, or None."""
+    client = get_client()
+    result = (
+        client.table("latest_profiles")
+        .select("profile_text")
+        .eq("neighborhood_name", neighborhood_name)
+        .execute()
+    )
+    return result.data[0]["profile_text"] if result.data else None
+
+
 def load_neighborhood_centroids() -> dict[str, tuple[float, float]]:
     """
     Read neighborhood centroids from GeoJSON (no DB round-trip).
