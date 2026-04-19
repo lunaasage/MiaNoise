@@ -62,4 +62,17 @@ Read this at the start of every session. Update after every correction or unexpe
 
 ## Sprint 2
 
-*(to be filled)*
+### L11 — Don't default to paid closed-source LLMs without justification
+**What happened:** Defaulted to Anthropic Claude for both profile synthesis and the live agent without questioning whether it was the right tool. Luna challenged this.
+**Lesson:** For any LLM choice, ask first: (1) does this need a frontier model or will a smaller open-source one do? (2) does this fire per user or per pipeline run? (3) is there a free tier that covers PoC scale?
+**Rule:** Justify every LLM choice. Default to the cheapest viable option; escalate to frontier models only when smaller ones demonstrably fail.
+
+### L12 — Finetuning is not a default solution
+**What happened:** Luna asked why we weren't finetuning our own LLM. The honest answer: finetuning requires labeled training data we don't have, adds training/hosting cost, and solves a problem that doesn't exist — the synthesis task is standard instruction-following that base models handle well.
+**Lesson:** Finetuning is for when prompting consistently fails at a task, or when you need to bake domain style into weights at scale. For MiaNoise's query space, a well-engineered prompt on a base model is the right tool.
+**Rule:** Only consider finetuning if (a) you have 500+ labeled examples and (b) prompt engineering has already failed.
+
+### L13 — Consolidate providers; don't add a new one without reason
+**What happened:** Anthropic was in the stack for synthesis while OpenAI was already in the stack for embeddings. No good reason to run two paid LLM providers.
+**Lesson:** Each provider = another API key, billing account, SDK dependency, and failure mode. OpenAI GPT-4o-mini handles synthesis as well as Claude Sonnet for this task, at lower cost, with no new integration needed.
+**Rule:** Default to the provider already in the stack unless there's a specific capability gap.

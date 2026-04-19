@@ -4,11 +4,11 @@ Neighborhood noise profile synthesis.
 Combines:
   - Composite noise score (0–1) and per-source breakdown from the DB
   - Top retrieved review chunks (from rag/retriever.py)
-  - Claude claude-sonnet-4-20250514 for natural-language synthesis
+  - OpenAI GPT-4o-mini for natural-language synthesis
 
 Entry point: generate_profile(neighborhood_name) → str narrative
 
-The prompt is designed so Claude can only claim things the retrieved text
+The prompt is designed so the model can only claim things the retrieved text
 or numeric scores actually support. No hallucination of venues, hours, or
 specific addresses — the narrative is grounded in what's in the chunks.
 """
@@ -16,14 +16,14 @@ specific addresses — the narrative is grounded in what's in the chunks.
 import logging
 import os
 
-import anthropic
+from openai import OpenAI
 
 from ingestion.db import get_client
 from rag.retriever import retrieve_multi_query
 
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-sonnet-4-6"
+MODEL = "gpt-4o-mini"
 MAX_TOKENS = 512
 
 SYNTHESIS_QUERIES = [
@@ -116,14 +116,16 @@ def generate_profile(neighborhood_name: str) -> str:
 
     prompt = _build_prompt(neighborhood_name, composite, source_scores, chunks)
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    response = client.messages.create(
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    response = client.chat.completions.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
     )
-    profile = response.content[0].text.strip()
+    profile = response.choices[0].message.content.strip()
 
     logger.info(
         "synthesizer: generated profile for %r (%d chunks, score=%.2f)",

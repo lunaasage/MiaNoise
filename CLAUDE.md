@@ -64,16 +64,17 @@ mianoise/
 ---
 
 ## Tech Stack
-| Layer | Tool |
-|---|---|
-| Database | Supabase (PostgreSQL + pgvector) |
-| Embeddings | OpenAI text-embedding-3-small |
-| LLM Synthesis | Claude claude-sonnet-4-20250514 |
-| Agent | LangChain AgentExecutor |
-| Evaluation | RAGAS |
-| Frontend | Streamlit + Folium/Pydeck |
-| Scheduling | n8n (nightly data refresh) |
-| Version Control | GitHub (branches: `main`, `poc`) |
+| Layer | Tool | Notes |
+|---|---|---|
+| Database | Supabase (PostgreSQL + pgvector) | |
+| Embeddings | OpenAI text-embedding-3-small | |
+| Profile synthesis | OpenAI GPT-4o-mini | Pipeline time only — one call per neighborhood per night |
+| Live agent | Groq Llama 3.1 70B | Free tier (14,400 req/day); fires only on user queries |
+| Agent framework | LangChain AgentExecutor | |
+| Evaluation | RAGAS | |
+| Frontend | Streamlit + Folium/Pydeck | |
+| Scheduling | n8n (nightly data refresh) | |
+| Version Control | GitHub (branches: `main`, `poc`) | |
 
 ---
 

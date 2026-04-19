@@ -80,6 +80,18 @@
 - Existing API key, no additional cost
 - Reddit public JSON revisited if review volume is thin for specific neighborhoods
 
+### Direction Change — LLM Stack (confirmed Apr 19)
+
+**Tried:** Anthropic Claude (claude-sonnet-4-6) for profile synthesis → dropped.
+**Considered:** Finetuning a custom LLM → rejected. Task is standard instruction-following that frontier models handle well out of the box; would require hundreds of labeled profiles to train on, ongoing retraining, and a hosted inference endpoint. Wrong tool for the job.
+**Considered:** Anthropic Claude for live agent → rejected. Per-user API cost at scale; no reason to default to a paid closed-source model for a bounded query space.
+**Decided (with Luna):**
+- Profile synthesis (pipeline time): OpenAI GPT-4o-mini. Already in stack for embeddings, cheaper than Sonnet, sufficient for structured narrative generation.
+- Live conversational agent: Groq free tier (Llama 3.1 70B). Zero per-query cost, 14,400 requests/day free, LangChain-native.
+- Anthropic removed from stack entirely.
+
+**Rationale:** Consolidate to one paid provider (OpenAI) for pipeline-time tasks; use free open-source inference (Groq) for live user-facing queries. Groq only fires when a user types — page loads and map clicks cost nothing.
+
 ### Open Questions (resolve before starting)
-- **DATA GATE:** Is Google Places review volume and quality sufficient for a viable RAG corpus? Run exploration before implementing. (in progress)
-- Chunking strategy: fixed 512-token windows vs. sentence-boundary — which fits review content better?
+- **DATA GATE:** Is Google Places review volume and quality sufficient for a viable RAG corpus? Run exploration before implementing. (resolved Apr 19 — GO)
+- Chunking strategy: fixed 512-token windows vs. sentence-boundary — which fits review content better? (resolved Apr 19 — one review = one chunk, venue context prepended)
