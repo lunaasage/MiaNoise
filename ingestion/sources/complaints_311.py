@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime, timedelta, timezone
 
 import geopandas as gpd
 import pandas as pd
@@ -10,53 +11,40 @@ from .base import NeighborhoodScore, NoiseSource
 
 logger = logging.getLogger(__name__)
 
-# Miami-Dade Code Compliance Violation open dataset.
-# Note: Miami-Dade County 311 datasets (data_311_YYYY) categorise only waste
-# and infrastructure requests — noise complaints are handled by Code Compliance.
-# This endpoint returns open violations; filter PROBLEM_DESC for noise.
+# City of Miami 311 Service Requests (since 2015).
+# Separate from Miami-Dade County 311 (different jurisdiction, different system).
+# City of Miami covers Wynwood, Brickell, Little Havana, Downtown, etc. — our
+# exact target neighborhoods (lat ~25.73–25.85).
 FEATURE_SERVICE_URL = (
-    "https://services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services"
-    "/CodeComplianceViolation_Open_View/FeatureServer/0/query"
+    "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services"
+    "/City_of_Miami_311_Service_Requests_Since_2015/FeatureServer/0/query"
 )
 
-NOISE_WHERE = "UPPER(PROBLEM_DESC) LIKE '%NOISE%'"
 PAGE_SIZE = 2000
 
 
 class Complaints311(NoiseSource):
-    """
-    Miami-Dade Code Compliance — open noise regulation violations.
-
-    Weight is 0.0 for the PoC: the open violations dataset covers south
-    Miami-Dade (lat 25.51–25.72) while our neighborhood GeoJSON covers the
-    City of Miami (lat ~25.73–25.85). Geographic mismatch means the spatial
-    join finds 0 violations for virtually every neighborhood.
-
-    The fetch() still runs so violations can feed the RAG corpus as context.
-    Replace with a City of Miami noise complaint source in the full version.
-    """
+    """City of Miami 311 — noise violation service requests (NOISEVIO) per neighborhood."""
 
     source_id = "complaints_311"
-    weight = 0.0  # RAG corpus only — geographic mismatch with PoC neighborhoods
+    weight = 0.3
     required_env_vars = []  # public dataset — no key required
 
     def fetch(self) -> list[NeighborhoodScore]:
         neighborhoods = load_neighborhood_geodataframe()[["name", "geometry"]]
-
         records = self._fetch_all_records()
+
         if not records:
             logger.warning("complaints_311: no records returned — returning zero scores")
             return self._zero_scores(neighborhoods)
 
-        # ArcGIS returns geometry in the requested outSR; x=lon, y=lat
-        df = pd.DataFrame([
-            {"longitude": f["geometry"]["x"], "latitude": f["geometry"]["y"]}
-            for f in records
-            if f.get("geometry") and f["geometry"].get("x") and f["geometry"].get("y")
-        ])
+        df = pd.DataFrame(records)
+        df["latitude"]  = pd.to_numeric(df.get("latitude"),  errors="coerce")
+        df["longitude"] = pd.to_numeric(df.get("longitude"), errors="coerce")
+        df = df.dropna(subset=["latitude", "longitude"])
 
         if df.empty:
-            logger.warning("complaints_311: no usable coordinates in response")
+            logger.warning("complaints_311: all records missing coordinates")
             return self._zero_scores(neighborhoods)
 
         complaints_gdf = gpd.GeoDataFrame(
@@ -80,9 +68,8 @@ class Complaints311(NoiseSource):
             return self._zero_scores(neighborhoods)
 
         logger.info(
-            "complaints_311: %d violations mapped across %d neighborhoods",
-            counts.sum(),
-            (counts > 0).sum(),
+            "complaints_311: %d violations across %d neighborhoods (max=%d)",
+            int(counts.sum()), int((counts > 0).sum()), int(max_count),
         )
         return [
             NeighborhoodScore(
@@ -96,26 +83,27 @@ class Complaints311(NoiseSource):
         ]
 
     def _fetch_all_records(self) -> list[dict]:
-        """Paginate through the ArcGIS feature service and return all matching features."""
-        records = []
-        offset = 0
-        headers = {}
-        app_token = os.getenv("MIAMI_DATA_APP_TOKEN")
-        if app_token:
-            headers["X-App-Token"] = app_token
+        """Fetch City of Miami NOISEVIO records from the last 12 months, paginated."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=365)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        where = (
+            f"issue_type = 'NOISEVIO' "
+            f"AND ticket_created_date_time >= TIMESTAMP '{cutoff}'"
+        )
 
+        records, offset = [], 0
         while True:
             params = {
-                "where": NOISE_WHERE,
-                "outFields": "PROBLEM_DESC",
-                "outSR": "4326",      # return geometry in WGS84
+                "where": where,
+                "outFields": "issue_type,latitude,longitude,ticket_created_date_time",
                 "resultRecordCount": PAGE_SIZE,
                 "resultOffset": offset,
                 "f": "json",
             }
             try:
                 resp = requests.get(
-                    FEATURE_SERVICE_URL, params=params, headers=headers, timeout=30
+                    FEATURE_SERVICE_URL, params=params, timeout=30
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -124,14 +112,14 @@ class Complaints311(NoiseSource):
                 break
 
             features = data.get("features", [])
-            records.extend(features)
+            records.extend(f["attributes"] for f in features)
             logger.debug("complaints_311: %d records at offset=%d", len(features), offset)
 
             if not data.get("exceededTransferLimit") or len(features) < PAGE_SIZE:
                 break
             offset += PAGE_SIZE
 
-        logger.info("complaints_311: %d total noise violation records fetched", len(records))
+        logger.info("complaints_311: %d NOISEVIO records (last 12 months)", len(records))
         return records
 
     @staticmethod

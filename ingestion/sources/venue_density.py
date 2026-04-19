@@ -22,7 +22,7 @@ class VenueDensity(NoiseSource):
     """Google Places API (New) — nightlife venue density per neighborhood."""
 
     source_id = "venue_density"
-    weight = 1.0  # sole scoring source for PoC (complaints data geographically mismatched)
+    weight = 0.0  # OSMVenueDensity is the primary venue scorer; this is Sprint 2 enrichment only
     required_env_vars = ["GOOGLE_PLACES_API_KEY"]
 
     def fetch(self) -> list[NeighborhoodScore]:
