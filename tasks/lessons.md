@@ -43,6 +43,23 @@ Read this at the start of every session. Update after every correction or unexpe
 
 ---
 
+### L8 — gpd.overlay argument order matters for mixed geometry types
+**What happened:** Added `keep_geom_type=True` to `gpd.overlay(nbhd_utm, roads_utm)`. With df1=polygons and df2=linestrings, `keep_geom_type=True` keeps only Polygon results — which drops all LineString clippings (the actual road segments). Result: empty clipped GeoDataFrame → all scores zero. Previous runs worked by accident because some road ways form closed loops (roundabouts), producing Polygon intersection results.
+**Lesson:** When intersecting polygons with linestrings via `gpd.overlay`, put the linestring GDF as df1. Then `keep_geom_type=True` (default) correctly retains LineString results.
+**Fix:** `gpd.overlay(roads_utm, nbhd_utm, how="intersection")` — df1=roads.
+
+### L9 — overpass-api.de returns 406 without a User-Agent header
+**What happened:** Overpass primary endpoint returned 406 Not Acceptable on all requests. The 406 disappeared when a `User-Agent` header was added. Without User-Agent, requests are rejected at the HTTP gateway layer, not the query layer — no error message, no indication the query was even parsed.
+**Lesson:** Always include `User-Agent` on Overpass requests. Use a descriptive string: `MiaNoise/1.0 (noise intelligence research)`.
+**Rule:** All Overpass POST requests must include `OVERPASS_HEADERS`.
+
+### L10 — Heavy Overpass queries need local caching, not just retries
+**What happened:** The roads query (`out geom;` for 5573 ways) consistently times out on public Overpass instances under load. Adding more endpoints or retries doesn't solve it — the query is too heavy for shared infrastructure to be reliable. The venues query (`out center;` for 714 points) is lighter and usually succeeds but also times out under load.
+**Lesson:** For any Overpass query that fetches geometry (not just centroids), local GeoPackage caching with a TTL is mandatory, not optional. Cache once on first successful fetch; serve from cache thereafter; use stale cache as last resort before returning zeros.
+**Rule:** osm_roads TTL=7 days, osm_venues TTL=1 day. Cache path: `data/cache/` (gitignored).
+
+---
+
 ## Sprint 2
 
 *(to be filled)*

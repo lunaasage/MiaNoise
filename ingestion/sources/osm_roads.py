@@ -1,9 +1,10 @@
 import logging
+import time
+from pathlib import Path
 
 import geopandas as gpd
-import pandas as pd
 import requests
-from shapely.geometry import LineString, MultiLineString, shape
+from shapely.geometry import LineString
 
 from ingestion.db import load_neighborhood_geodataframe
 from .base import NeighborhoodScore, NoiseSource
@@ -14,6 +15,14 @@ OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
 ]
+
+# overpass-api.de returns 406 without a User-Agent header
+OVERPASS_HEADERS = {"User-Agent": "MiaNoise/1.0 (noise intelligence research)"}
+
+# Road geometry is stable — cache locally to avoid depending on Overpass being
+# available on every pipeline run. TTL of 7 days is appropriate for road networks.
+CACHE_PATH = Path("data/cache/osm_roads_miami.gpkg")
+CACHE_TTL_DAYS = 7
 
 # Noise weight per road type. Motorways generate ~3× the noise energy of a
 # primary road at equivalent traffic; weights reflect approximate dB contribution.
@@ -36,6 +45,9 @@ class OSMRoadNoise(NoiseSource):
     Road geometries are clipped to each neighborhood polygon before measuring length
     so a motorway that passes through two neighborhoods only counts for each
     proportionally.
+
+    Road geometry is cached locally (data/cache/osm_roads_miami.gpkg, 7-day TTL)
+    so the pipeline is not blocked by Overpass availability on every run.
     """
 
     source_id = "osm_roads"
@@ -53,12 +65,14 @@ class OSMRoadNoise(NoiseSource):
             return self._zero_scores(neighborhoods)
 
         # Project both layers to UTM 17N for metric length calculation
-        nbhd_utm   = neighborhoods.to_crs("EPSG:32617")
-        roads_utm  = roads_gdf.to_crs("EPSG:32617")
+        nbhd_utm  = neighborhoods.to_crs("EPSG:32617")
+        roads_utm = roads_gdf.to_crs("EPSG:32617")
 
-        # Clip roads to neighborhood boundaries, then measure weighted length
+        # Clip roads to neighborhood boundaries, then measure weighted length.
+        # df1=roads so keep_geom_type=True retains LineString results (correct);
+        # df1=neighborhoods (polygons) would silently drop all LineString clippings.
         try:
-            clipped = gpd.overlay(nbhd_utm, roads_utm, how="intersection")
+            clipped = gpd.overlay(roads_utm, nbhd_utm, how="intersection")
         except Exception as exc:
             logger.warning("osm_roads: overlay failed: %s", exc)
             return self._zero_scores(neighborhoods)
@@ -92,10 +106,43 @@ class OSMRoadNoise(NoiseSource):
         ]
 
     def _fetch_roads(self, bbox: str) -> gpd.GeoDataFrame:
-        """Query Overpass for major road geometries and return as GeoDataFrame."""
+        """
+        Return road GeoDataFrame, using local cache when available and fresh.
+
+        Cache strategy:
+          1. Fresh cache (< CACHE_TTL_DAYS old) → serve from cache, skip Overpass
+          2. No cache or stale → try Overpass; on success, write cache
+          3. Overpass fails but stale cache exists → serve stale cache with warning
+          4. Overpass fails and no cache → return empty GeoDataFrame
+        """
+        cache_age_days = self._cache_age_days()
+
+        if cache_age_days is not None and cache_age_days < CACHE_TTL_DAYS:
+            logger.info("osm_roads: loading from cache (age=%.1fd)", cache_age_days)
+            return gpd.read_file(CACHE_PATH)
+
+        gdf = self._fetch_from_overpass(bbox)
+
+        if not gdf.empty:
+            CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            gdf.to_file(CACHE_PATH, driver="GPKG")
+            logger.info("osm_roads: cached %d road segments to %s", len(gdf), CACHE_PATH)
+            return gdf
+
+        # Overpass failed — fall back to stale cache rather than returning zeros
+        if cache_age_days is not None:
+            logger.warning(
+                "osm_roads: Overpass unavailable, using stale cache (age=%.1fd)", cache_age_days
+            )
+            return gpd.read_file(CACHE_PATH)
+
+        return gpd.GeoDataFrame()
+
+    def _fetch_from_overpass(self, bbox: str) -> gpd.GeoDataFrame:
+        """Query Overpass for major road geometries. Returns empty GeoDataFrame on failure."""
         highway_filter = "|".join(ROAD_WEIGHTS.keys())
         query = f"""
-[out:json][timeout:90];
+[out:json][timeout:150];
 (
   way["highway"~"^({highway_filter})$"]({bbox});
 );
@@ -104,13 +151,16 @@ out geom;
         elements = None
         for url in OVERPASS_ENDPOINTS:
             try:
-                resp = requests.post(url, data={"data": query}, timeout=120)
+                resp = requests.post(
+                    url, data={"data": query}, headers=OVERPASS_HEADERS, timeout=180
+                )
                 resp.raise_for_status()
                 elements = resp.json().get("elements", [])
                 logger.info("osm_roads: %d road elements from %s", len(elements), url)
                 break
             except Exception as exc:
                 logger.warning("osm_roads: %s failed: %s — trying next", url, exc)
+
         if elements is None:
             logger.warning("osm_roads: all Overpass endpoints failed")
             return gpd.GeoDataFrame()
@@ -124,8 +174,8 @@ out geom;
                 continue
             highway_type = el.get("tags", {}).get("highway", "")
             rows.append({
-                "geometry": LineString(coords),
-                "highway":  highway_type,
+                "geometry":   LineString(coords),
+                "highway":    highway_type,
                 "road_weight": ROAD_WEIGHTS.get(highway_type, 1.0),
             })
 
@@ -133,6 +183,13 @@ out geom;
             return gpd.GeoDataFrame()
 
         return gpd.GeoDataFrame(rows, crs="EPSG:4326")
+
+    @staticmethod
+    def _cache_age_days() -> float | None:
+        """Return cache file age in days, or None if it doesn't exist."""
+        if not CACHE_PATH.exists():
+            return None
+        return (time.time() - CACHE_PATH.stat().st_mtime) / 86400
 
     @staticmethod
     def _bbox(gdf: gpd.GeoDataFrame) -> str:

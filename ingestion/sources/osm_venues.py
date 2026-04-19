@@ -1,9 +1,9 @@
 import logging
+import time
+from pathlib import Path
 
 import geopandas as gpd
-import pandas as pd
 import requests
-from shapely.geometry import Point
 
 from ingestion.db import load_neighborhood_geodataframe
 from .base import NeighborhoodScore, NoiseSource
@@ -14,6 +14,14 @@ OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
 ]
+
+# overpass-api.de returns 406 without a User-Agent header
+OVERPASS_HEADERS = {"User-Agent": "MiaNoise/1.0 (noise intelligence research)"}
+
+# Venue data cached locally to survive Overpass downtime. Shorter TTL than roads
+# (1 day) since venues open and close; road network is stable for weeks.
+CACHE_PATH = Path("data/cache/osm_venues_miami.gpkg")
+CACHE_TTL_DAYS = 1
 
 # Venue types that drive nighttime noise
 VENUE_AMENITIES = ["bar", "nightclub", "restaurant"]
@@ -28,6 +36,9 @@ class OSMVenueDensity(NoiseSource):
     - No per-search quota (Google Places caps at 20 results per type per area)
     - Returns every mapped venue in Miami — typically 3–5× more complete
     - Bounding box is computed from the neighborhood GeoJSON at fetch time
+
+    Venue points are cached locally (data/cache/osm_venues_miami.gpkg, 1-day TTL)
+    so the pipeline is not blocked by Overpass availability on every run.
     """
 
     source_id = "osm_venues"
@@ -39,24 +50,10 @@ class OSMVenueDensity(NoiseSource):
         neighborhoods = load_neighborhood_geodataframe()[["name", "geometry"]]
         bbox = self._bbox(neighborhoods)
 
-        elements = self._query_overpass(bbox)
-        if not elements:
-            logger.warning("osm_venues: Overpass returned no elements")
+        venues_gdf = self._fetch_venues(bbox)
+        if venues_gdf.empty:
+            logger.warning("osm_venues: no venue data available")
             return self._zero_scores(neighborhoods)
-
-        points = self._to_points(elements)
-        if not points:
-            logger.warning("osm_venues: no usable coordinates in Overpass response")
-            return self._zero_scores(neighborhoods)
-
-        venues_gdf = gpd.GeoDataFrame(
-            points,
-            geometry=gpd.points_from_xy(
-                [p["lon"] for p in points],
-                [p["lat"] for p in points],
-            ),
-            crs="EPSG:4326",
-        )
 
         joined = gpd.sjoin(
             venues_gdf[["geometry"]],
@@ -87,6 +84,44 @@ class OSMVenueDensity(NoiseSource):
             for name, count in counts.items()
         ]
 
+    def _fetch_venues(self, bbox: str) -> gpd.GeoDataFrame:
+        """
+        Return venue GeoDataFrame, using local cache when available and fresh.
+
+        Cache strategy mirrors osm_roads: fresh cache → serve; stale/missing →
+        try Overpass; on success write cache; on failure serve stale if available.
+        """
+        cache_age_days = self._cache_age_days()
+
+        if cache_age_days is not None and cache_age_days < CACHE_TTL_DAYS:
+            logger.info("osm_venues: loading from cache (age=%.2fd)", cache_age_days)
+            return gpd.read_file(CACHE_PATH)
+
+        elements = self._query_overpass(bbox)
+        if elements:
+            points = self._to_points(elements)
+            if points:
+                gdf = gpd.GeoDataFrame(
+                    points,
+                    geometry=gpd.points_from_xy(
+                        [p["lon"] for p in points],
+                        [p["lat"] for p in points],
+                    ),
+                    crs="EPSG:4326",
+                )
+                CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+                gdf.to_file(CACHE_PATH, driver="GPKG")
+                logger.info("osm_venues: cached %d venues to %s", len(gdf), CACHE_PATH)
+                return gdf
+
+        if cache_age_days is not None:
+            logger.warning(
+                "osm_venues: Overpass unavailable, using stale cache (age=%.2fd)", cache_age_days
+            )
+            return gpd.read_file(CACHE_PATH)
+
+        return gpd.GeoDataFrame()
+
     def _query_overpass(self, bbox: str) -> list[dict]:
         amenity_regex = "|".join(VENUE_AMENITIES)
         query = f"""
@@ -99,7 +134,9 @@ out center;
 """
         for url in OVERPASS_ENDPOINTS:
             try:
-                resp = requests.post(url, data={"data": query}, timeout=120)
+                resp = requests.post(
+                    url, data={"data": query}, headers=OVERPASS_HEADERS, timeout=120
+                )
                 resp.raise_for_status()
                 elements = resp.json().get("elements", [])
                 logger.info("osm_venues: %d elements from %s", len(elements), url)
@@ -121,10 +158,16 @@ out center;
         return points
 
     @staticmethod
+    def _cache_age_days() -> float | None:
+        """Return cache file age in days, or None if it doesn't exist."""
+        if not CACHE_PATH.exists():
+            return None
+        return (time.time() - CACHE_PATH.stat().st_mtime) / 86400
+
+    @staticmethod
     def _bbox(gdf: gpd.GeoDataFrame) -> str:
-        """Compute Overpass bbox string (south,west,north,east) from GeoDataFrame."""
-        bounds = gdf.total_bounds  # [minx, miny, maxx, maxy]
-        pad = 0.01  # ~1km padding so edge neighborhoods aren't clipped
+        bounds = gdf.total_bounds
+        pad = 0.01
         return f"{bounds[1]-pad},{bounds[0]-pad},{bounds[3]+pad},{bounds[2]+pad}"
 
     @staticmethod
