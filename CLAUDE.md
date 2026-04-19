@@ -122,12 +122,25 @@ explains *why* a neighborhood has that score using retrieved review text.
 
 ## Current Status
 - **Branch**: `poc`
-- **Sprint**: 2 (starting)
-- **Completed (Sprint 1)**: `ingestion/db.py`, `complaints_311.fetch()` (City of Miami 311 NOISEVIO, ArcGIS REST, 12-month rolling window, weight=0.3), `osm_venues.py` (OSMVenueDensity — Overpass bar/nightclub/restaurant, no API key, weight=0.5), `osm_roads.py` (OSMRoadNoise — Overpass weighted road-km in UTM 17N, no API key, weight=0.2), `venue_density.py` weight zeroed (Google Places deferred to Sprint 2), `run_and_persist()` + `__main__` in pipeline.py
-- **Active PoC sources**: complaints_311 (0.3) + osm_venues (0.5) + osm_roads (0.2) = 1.0 total weight, all require no API key
-- **Next**: implement `yelp_reviews.fetch()` and `reddit_posts.fetch()` (RAG corpus text), embed review chunks with OpenAI text-embedding-3-small, store in Supabase `embeddings` table, build RAG retrieval function and LLM synthesis to generate neighborhood profiles
+- **Sprint**: 2 [CURRENT]
+- **Sprint 1**: DONE (confirmed Apr 19) — pipeline runs end-to-end, 104 neighborhoods scored, data in Supabase
+- **Next**: RAG corpus (`yelp_reviews`, `reddit_posts`), embed with OpenAI text-embedding-3-small, store in `embeddings` table, build retrieval + LLM synthesis for neighborhood profiles
 
-> Update this section at the end of every sprint.
+### Key Files
+| File | Role | Sprint | Status |
+|---|---|---|---|
+| `ingestion/db.py` | Supabase I/O (seed, write_scores, load GDF/centroids) | 1 | Active |
+| `ingestion/sources/complaints_311.py` | City of Miami 311 NOISEVIO scoring (weight=0.3) | 1 | Active |
+| `ingestion/sources/osm_venues.py` | OSM venue density scoring (weight=0.5) | 1 | Active |
+| `ingestion/sources/osm_roads.py` | OSM weighted road-km scoring (weight=0.2) | 1 | Active |
+| `ingestion/pipeline.py` | Orchestrator + `run_and_persist()` entry point | 1 | Active |
+| `ingestion/score_engine.py` | Weighted composite score computation | 0 | Active |
+| `ingestion/sources/base.py` | `NoiseSource` ABC + `NeighborhoodScore` dataclass | 0 | Active |
+| `migrations/001_initial_schema.sql` | Supabase DDL (neighborhoods, noise_scores, reviews, embeddings) | 0 | Active |
+| `data/geojson/miami_neighborhoods.geojson` | 106 neighborhood polygons (WGS84) | 0 | Active |
+| `ingestion/sources/venue_density.py` | Google Places — deferred to Sprint 2, weight=0, disabled | 1 | Inactive |
+
+> NEVER update sprint status or this table without Luna's explicit confirmation (Sprint Completion Protocol above).
 
 ---
 
@@ -137,10 +150,26 @@ explains *why* a neighborhood has that score using retrieved review text.
 - All API keys live in `.env` only — never hardcoded, never committed
 - Commit message format: `type: description` (types: `chore`, `feat`, `fix`, `docs`)
 - Branch `poc` is the working branch until April 29 — do not merge to `main` until PoC is complete
-- At the end of every sprint, before committing: 
-    1. Update ARCHITECTURE.md with every file built or modified — what it does, what it exports, how it connects to other modules
-    2. Update the Current Status section in CLAUDE.md with the completed sprint and next sprint
-    3. Update the Change Log table with date, sprint, change, and rationale
+
+### Sprint Completion Protocol (MANDATORY)
+When a sub-sprint or sprint is finished, DO NOT update status unilaterally. Ask Luna two things:
+1. "Can I mark [sub-sprint/sprint] as done?"
+2. "Which files should I log in the Key Files table? Here are my candidates: [list]"
+
+On confirmation:
+1. Check off the sprint, update status labels (CURRENT → DONE)
+2. Update the Key Files table — add new outputs, remove superseded files
+3. Update the Change Log
+4. Update ARCHITECTURE.md for any new or modified modules
+
+### Lessons Tracking
+- `tasks/lessons.md` — updated after every correction or unexpected finding. Read at session start.
+- `tasks/todo.md` — current sprint task list. Updated when direction changes are confirmed.
+
+### No Guessing
+- Never hardcode a value that can be queried or derived
+- When data behaves unexpectedly (zero rows, wrong geography, stale dates): investigate before assuming the code is wrong
+- Surface unexpected findings to Luna rather than patching around them
 
 ---
 
