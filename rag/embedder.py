@@ -36,25 +36,41 @@ def _get_openai() -> OpenAI:
     return OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 
+def _fetch_all_pages(client, table: str, select: str, filters: dict | None = None) -> list[dict]:
+    """
+    Paginate a Supabase table query until all rows are fetched.
+    Builds a fresh query per page to avoid Supabase SDK param accumulation bug
+    that occurs when calling .range() on the same query object multiple times.
+    """
+    PAGE = 1000
+    results = []
+    offset = 0
+    while True:
+        q = client.table(table).select(select)
+        for col, val in (filters or {}).items():
+            q = q.eq(col, val)
+        batch = q.range(offset, offset + PAGE - 1).execute().data
+        results.extend(batch)
+        if len(batch) < PAGE:
+            break
+        offset += PAGE
+    return results
+
+
 def _iter_unembedded_reviews(
     client, neighborhood_id: str | None = None
 ) -> Iterator[dict]:
     """
     Yield reviews that don't yet have a corresponding embeddings row.
-    Uses a NOT IN subquery via Supabase PostgREST.
-    Filters to a single neighborhood_id when provided.
+    Paginates both queries to handle > 1000 rows (Supabase PostgREST default limit).
     """
-    # Fetch already-embedded review IDs
-    embedded_q = client.table("embeddings").select("review_id")
-    if neighborhood_id:
-        embedded_q = embedded_q.eq("neighborhood_id", neighborhood_id)
-    embedded_ids = {r["review_id"] for r in embedded_q.execute().data}
+    filters = {"neighborhood_id": neighborhood_id} if neighborhood_id else {}
 
-    # Fetch all reviews (optionally filtered)
-    reviews_q = client.table("reviews").select("id,neighborhood_id,content")
-    if neighborhood_id:
-        reviews_q = reviews_q.eq("neighborhood_id", neighborhood_id)
-    all_reviews = reviews_q.execute().data
+    embedded_ids = {
+        r["review_id"]
+        for r in _fetch_all_pages(client, "embeddings", "review_id", filters)
+    }
+    all_reviews = _fetch_all_pages(client, "reviews", "id,neighborhood_id,content", filters)
 
     for row in all_reviews:
         if row["id"] not in embedded_ids:

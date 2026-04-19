@@ -23,7 +23,7 @@ from rag.retriever import retrieve_multi_query
 
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 512
 
 SYNTHESIS_QUERIES = [
@@ -142,10 +142,10 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s — %(message)s",
     )
-    load_dotenv()
+    load_dotenv(override=True)
 
     import sys
-    name = sys.argv[1] if len(sys.argv) > 1 else "Wynwood"
+    name = sys.argv[1] if len(sys.argv) > 1 else "Wynwood Industrial District"
     profile = generate_profile(name)
     print(f"\n=== {name} Noise Profile ===\n")
     print(profile)
