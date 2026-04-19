@@ -100,7 +100,7 @@ mianoise/
 Composite score = weighted sum of normalized (0–1) signals per neighborhood.
 Weights are adjustable and documented in `ingestion/score_engine.py`.
 
-- **PoC weights**: 311 complaints (0.5) + venue density (0.5)
+- **PoC weights**: 311 complaints (0.3) + OSM venue density (0.5) + OSM road noise (0.2)
 - **Full version weights**: to be calibrated once all sources are active
 
 Score is computed at ingestion time and stored in Supabase. The RAG layer then
@@ -123,7 +123,8 @@ explains *why* a neighborhood has that score using retrieved review text.
 ## Current Status
 - **Branch**: `poc`
 - **Sprint**: 2 (starting)
-- **Completed (Sprint 1)**: `ingestion/db.py` (Supabase client, seed_neighborhoods, write_scores, centroid/GDF loaders), `complaints_311.fetch()` (ArcGIS REST + geopandas spatial join + max-normalization), `venue_density.fetch()` (Google Places Nearby Search + per-neighborhood circumradius in UTM 17N + max-normalization), `run_and_persist()` + `__main__` in pipeline.py, `SUPABASE_SERVICE_KEY` in `.env.example`
+- **Completed (Sprint 1)**: `ingestion/db.py`, `complaints_311.fetch()` (City of Miami 311 NOISEVIO, ArcGIS REST, 12-month rolling window, weight=0.3), `osm_venues.py` (OSMVenueDensity — Overpass bar/nightclub/restaurant, no API key, weight=0.5), `osm_roads.py` (OSMRoadNoise — Overpass weighted road-km in UTM 17N, no API key, weight=0.2), `venue_density.py` weight zeroed (Google Places deferred to Sprint 2), `run_and_persist()` + `__main__` in pipeline.py
+- **Active PoC sources**: complaints_311 (0.3) + osm_venues (0.5) + osm_roads (0.2) = 1.0 total weight, all require no API key
 - **Next**: implement `yelp_reviews.fetch()` and `reddit_posts.fetch()` (RAG corpus text), embed review chunks with OpenAI text-embedding-3-small, store in Supabase `embeddings` table, build RAG retrieval function and LLM synthesis to generate neighborhood profiles
 
 > Update this section at the end of every sprint.
@@ -158,6 +159,10 @@ explains *why* a neighborhood has that score using retrieved review text.
 | Apr 17, 2026 | 1 | `venue_density.fetch()` — Google Places + per-neighborhood radius | Per-neighborhood circumradius (UTM 17N, capped 1500m) chosen over fixed 800m due to Miami's uneven neighborhood sizes |
 | Apr 17, 2026 | 1 | `run_and_persist()` + `__main__` in pipeline.py | Keeps `run_pipeline()` pure/testable; persistence is a separate entry point |
 | Apr 17, 2026 | 1 | `SUPABASE_SERVICE_KEY` added to `.env.example` | Anon key is read-only (RLS); service role key required for ingestion writes |
+| Apr 17, 2026 | 1 | `osm_venues.py` — OSMVenueDensity (weight=0.5) | OSM Overpass returns every mapped venue in Miami — 3–5× more complete than Google Places, no API key, no quota |
+| Apr 17, 2026 | 1 | `osm_roads.py` — OSMRoadNoise (weight=0.2) | OSM weighted road-km replaces TomTom for PoC; motorway×3.0 → primary×1.0 weights reflect dB contribution; clipped to neighborhood polygons in UTM 17N |
+| Apr 17, 2026 | 1 | `complaints_311.py` rewritten to City of Miami 311 NOISEVIO (weight=0.3) | Miami-Dade 311 has no noise category; Code Compliance violations are geographically mismatched (lat 25.51–25.72 vs. City of Miami lat 25.73–25.85) |
+| Apr 17, 2026 | 1 | `venue_density.py` weight 1.0 → 0.0 | OSMVenueDensity takes over primary venue scoring; Google Places deferred to Sprint 2 for cross-validation |
 
 ---
 

@@ -279,15 +279,16 @@ construct a Supabase client directly — they import from here.
 
 ### `ingestion/sources/complaints_311.py` (implemented)
 
-**Class:** `Complaints311` — `source_id="complaints_311"`, `weight=0.5`
+**Class:** `Complaints311` — `source_id="complaints_311"`, `weight=0.3`
 
-Fetches Miami-Dade 311 noise complaints from the ArcGIS Feature Service
-(`data_311_2022`) and computes a complaint-density score per neighborhood.
+Fetches City of Miami 311 NOISEVIO service requests from the last 12 months
+and computes a complaint-density score per neighborhood.
 
 **`fetch()` steps:**
 1. Load neighborhood polygons via `db.load_neighborhood_geodataframe()`.
-2. Query ArcGIS REST endpoint (`FEATURE_SERVICE_URL`) with `where=issue_type LIKE '%NOISE%'`,
-   paginating in 2000-record pages until `exceededTransferLimit` is false.
+2. Query the City of Miami ArcGIS Feature Service (`services1.arcgis.com/CvuPhqcTQpZPT9qY/...`),
+   filtering for `issue_type = 'NOISEVIO'` AND `ticket_created_date_time >= (now - 365 days)`.
+   Paginate in 2000-record pages.
 3. Drop records with null or non-numeric lat/lon.
 4. Build a `GeoDataFrame` of complaint points (WGS84).
 5. `gpd.sjoin(complaints, neighborhoods, predicate="within")` — spatial join.
@@ -295,39 +296,74 @@ Fetches Miami-Dade 311 noise complaints from the ArcGIS Feature Service
 7. Max-normalize: `score = count / max_count`.
 8. Return `list[NeighborhoodScore]` with `metadata={"raw_count": int}`.
 
-**Env vars:** none required; `MIAMI_DATA_APP_TOKEN` optional (rate limit header).
+**Why City of Miami (not Miami-Dade):** Miami-Dade County 311 datasets contain
+only waste/infrastructure requests — no noise category. City of Miami covers the
+exact target neighborhoods (Wynwood, Brickell, Little Havana, lat ~25.73–25.85).
+
+**Env vars:** none required.
 
 **Connects to:** `ingestion/db.py` (`load_neighborhood_geodataframe()`),
 `ingestion/sources/base.py` (inherits `NoiseSource`).
 
 ---
 
-### `ingestion/sources/venue_density.py` (implemented)
+### `ingestion/sources/osm_venues.py`
 
-**Class:** `VenueDensity` — `source_id="venue_density"`, `weight=0.5`
+**Class:** `OSMVenueDensity` — `source_id="osm_venues"`, `weight=0.5`
 
-Counts nightlife venues near each neighborhood centroid using the Google Places
-Nearby Search API and computes a venue-density score per neighborhood.
+Bar/nightclub/restaurant density per neighborhood via OSM Overpass API.
+No API key required; returns every mapped venue in Miami (~3–5× more complete
+than Google Places, which caps at 20 results per type per query).
 
 **`fetch()` steps:**
-1. Load centroids via `db.load_neighborhood_centroids()` (name → (lat, lon)).
-2. Compute per-neighborhood search radius via `_compute_radii()` (see below).
-3. For each neighborhood, call `_count_places()` three times: `bar`, `night_club`, `restaurant`.
-4. Sum venue counts. Max-normalize across all neighborhoods.
-5. Return `list[NeighborhoodScore]` with `metadata={bar_count, club_count, restaurant_count, total}`.
+1. Load neighborhood polygons via `db.load_neighborhood_geodataframe()`.
+2. Compute bounding box with 0.01° padding; POST Overpass query for
+   `amenity~"^(bar|nightclub|restaurant)$"` nodes and ways.
+3. Extract lat/lon: nodes directly, ways via `center` coords.
+4. Spatial join points to neighborhoods.
+5. Count per neighborhood, max-normalize, return `list[NeighborhoodScore]`.
 
-**`_compute_radii()`:** Reprojects GeoJSON to UTM Zone 17N (EPSG:32617, meters),
-computes each polygon's circumradius (max centroid-to-vertex distance), clips to
-1500m upper bound. Miami neighborhoods range from ~300m (Brickell Key) to ~1.5km
-(Allapattah) — per-neighborhood radii avoid over/undercounting.
+**Env vars:** none.
 
-**`_count_places()`:** Up to 3 pages per type (60 results max). Waits 2s between
-paginated requests per Google's `next_page_token` requirement.
+**Connects to:** `ingestion/db.py`, `ingestion/sources/base.py`.
+
+---
+
+### `ingestion/sources/osm_roads.py`
+
+**Class:** `OSMRoadNoise` — `source_id="osm_roads"`, `weight=0.2`
+
+Weighted road-km per neighborhood as a traffic noise proxy via OSM Overpass.
+No API key required; replaces TomTom/FDOT for the PoC.
+
+**Score:** `sum(clipped_length_m × road_weight)` per neighborhood, max-normalized.
+Road weights: motorway×3.0, trunk×2.0, primary×1.0 (reflecting ~dB contribution).
+
+**`fetch()` steps:**
+1. Load neighborhoods; compute bounding box.
+2. POST Overpass query for `highway~"^(motorway|trunk|primary|...)"`, requesting full geometry.
+3. Build `GeoDataFrame` of `LineString` geometries with `road_weight` column.
+4. Reproject both layers to UTM Zone 17N (EPSG:32617) for metric accuracy.
+5. `gpd.overlay(how="intersection")` clips road segments to neighborhood polygons.
+6. `geometry.length` × `road_weight` → sum per neighborhood → max-normalize.
+
+**Env vars:** none.
+
+**Connects to:** `ingestion/db.py`, `ingestion/sources/base.py`.
+
+---
+
+### `ingestion/sources/venue_density.py` (Sprint 2 enrichment)
+
+**Class:** `VenueDensity` — `source_id="venue_density"`, `weight=0.0`
+
+Google Places API (New) venue density. Weight is 0 — `OSMVenueDensity` is the
+primary venue scorer for PoC. This source activates in Sprint 2 for cross-validation
+and enrichment when `GOOGLE_PLACES_API_KEY` is present.
 
 **Env vars:** `GOOGLE_PLACES_API_KEY`.
 
-**Connects to:** `ingestion/db.py` (`load_neighborhood_centroids()`,
-`load_neighborhood_geodataframe()`), `ingestion/sources/base.py`.
+**Connects to:** `ingestion/db.py`, `ingestion/sources/base.py`.
 
 ---
 
@@ -369,8 +405,10 @@ pipeline.py
   ├── run_pipeline() ──────────────────────────────────────────────────────────┐
   │     └── sources/__init__.py  →  ALL_SOURCES                                │
   │           ├── complaints_311.py ──┐                                        │
-  │           ├── venue_density.py   │  inherit NoiseSource / NeighborhoodScore│
-  │           ├── yelp_reviews.py    ├── sources/base.py                       │
+  │           ├── osm_venues.py      │  inherit NoiseSource / NeighborhoodScore│
+  │           ├── osm_roads.py       ├── sources/base.py                       │
+  │           ├── venue_density.py   │                                         │
+  │           ├── yelp_reviews.py    │                                         │
   │           ├── reddit_posts.py    │                                         │
   │           ├── tomtom_traffic.py  │                                         │
   │           ├── opensky_flights.py │                                         │
@@ -383,6 +421,8 @@ pipeline.py
               └── write_scores()       → Supabase noise_scores table
 
 complaints_311.py  → db.load_neighborhood_geodataframe()
+osm_venues.py      → db.load_neighborhood_geodataframe()
+osm_roads.py       → db.load_neighborhood_geodataframe()
 venue_density.py   → db.load_neighborhood_centroids()
                    → db.load_neighborhood_geodataframe()  (for radii)
 ```
