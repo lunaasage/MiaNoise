@@ -68,7 +68,18 @@
 - [ ] **2.5** Profile synthesis — claude-sonnet + retrieved chunks + composite score → neighborhood noise narrative
 - [ ] **2.6** End-to-end test — run for Wynwood, verify output matches North Star
 
+### Direction Change — Corpus Sources (confirmed Apr 19)
+
+**Tried:** Yelp Fusion API → too expensive for PoC budget. Dropped.
+**Tried:** Reddit PRAW API → Reddit locked API access behind formal builder approval in 2023. Dropped.
+**Considered:** Reddit public JSON endpoints (no key, rate-limited) → viable as nice-to-have supplement, not core.
+**Decided (with Luna):** Google Places reviews as sole primary corpus. Rationale:
+- 714 OSM venues already mapped to neighborhoods — neighborhood tagging solved
+- Places API New returns up to 5 reviews/venue → ceiling ~3,500 reviews
+- Reviews for bars/nightclubs/restaurants naturally cover noise, hours, atmosphere
+- Existing API key, no additional cost
+- Reddit public JSON revisited if review volume is thin for specific neighborhoods
+
 ### Open Questions (resolve before starting)
-- Yelp Fusion quota: how many reviews can we pull per neighborhood before hitting limits?
-- Reddit post quality: do r/miami posts mention neighborhood names explicitly or use street names/landmarks? Sample first.
+- **DATA GATE:** Is Google Places review volume and quality sufficient for a viable RAG corpus? Run exploration before implementing. (in progress)
 - Chunking strategy: fixed 512-token windows vs. sentence-boundary — which fits review content better?

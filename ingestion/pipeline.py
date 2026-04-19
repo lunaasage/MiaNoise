@@ -11,7 +11,7 @@ import logging
 
 from ingestion.score_engine import compute_composite_scores
 from ingestion.sources import ALL_SOURCES
-from ingestion.sources.base import NeighborhoodScore, NoiseSource
+from ingestion.sources.base import CorpusDocument, NeighborhoodScore, NoiseSource
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +19,25 @@ logger = logging.getLogger(__name__)
 def _fetch_results(
     active: list[NoiseSource],
 ) -> dict[str, list[NeighborhoodScore]]:
+    """Fetch from scoring sources. Only collects list[NeighborhoodScore] results."""
     results: dict[str, list[NeighborhoodScore]] = {}
     for source in active:
         readings = source.fetch_safe()
-        if readings is not None:
+        if readings is not None and readings and isinstance(readings[0], NeighborhoodScore):
             results[source.source_id] = readings
     return results
+
+
+def _fetch_corpus(
+    active: list[NoiseSource],
+) -> list[CorpusDocument]:
+    """Fetch from corpus sources. Collects and flattens list[CorpusDocument] results."""
+    documents: list[CorpusDocument] = []
+    for source in active:
+        results = source.fetch_safe()
+        if results is not None and results and isinstance(results[0], CorpusDocument):
+            documents.extend(results)
+    return documents
 
 
 def _split_by_role(
@@ -93,12 +106,13 @@ def run_and_persist() -> dict[str, float]:
     }
     db.write_scores(composite, per_source)
 
-    # Corpus sources: fetch and hold — Sprint 2 will write these to the reviews table
-    corpus_results = _fetch_results(corpus)
-    if corpus_results:
+    documents = _fetch_corpus(corpus)
+    if documents:
+        written = db.write_corpus(documents)
         logger.info(
-            "Corpus data collected from %s — Sprint 2 will persist to reviews table",
-            list(corpus_results),
+            "Corpus: wrote %d review documents from %d corpus source(s)",
+            written,
+            len(corpus),
         )
 
     return composite

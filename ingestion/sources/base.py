@@ -8,6 +8,17 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class CorpusDocument:
+    """A single text document for the RAG corpus. Returned by corpus sources."""
+    neighborhood: str
+    source_id: str
+    content: str           # raw review/post text for embedding
+    author: str = ""
+    external_url: str = ""
+    metadata: dict = field(default_factory=dict)
+
+
+@dataclass
 class NeighborhoodScore:
     neighborhood: str
     normalized_score: float  # 0.0–1.0
@@ -59,11 +70,14 @@ class NoiseSource(ABC):
         return True
 
     @abstractmethod
-    def fetch(self) -> list[NeighborhoodScore]:
-        """Fetch noise data and return normalized scores per neighborhood."""
+    def fetch(self) -> list[NeighborhoodScore] | list[CorpusDocument]:
+        """
+        Fetch noise data. Scoring sources return list[NeighborhoodScore];
+        corpus sources return list[CorpusDocument].
+        """
         ...
 
-    def fetch_safe(self) -> list[NeighborhoodScore] | None:
+    def fetch_safe(self) -> list[NeighborhoodScore] | list[CorpusDocument] | None:
         """
         Pipeline entry point. Returns None when the source is unavailable.
         Re-raises NotImplementedError so unfinished stubs fail loudly in dev.
@@ -76,5 +90,5 @@ class NoiseSource(ABC):
         except NotImplementedError:
             raise
         except Exception as exc:
-            logger.warning("%s fetch failed: %s", self.source_id, exc)
+            logger.warning("%s fetch failed: %s", self.source_id, exc, exc_info=True)
             return None

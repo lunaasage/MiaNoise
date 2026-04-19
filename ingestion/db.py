@@ -103,6 +103,50 @@ def write_scores(
     return run_id
 
 
+def write_corpus(documents: list) -> int:
+    """
+    Insert CorpusDocument instances into the reviews table.
+
+    Resolves neighborhood names → UUIDs in a single round-trip.
+    Skips documents whose neighborhood has no DB record (shouldn't happen
+    after seed_neighborhoods, but safer to warn than to crash).
+
+    Returns number of rows written.
+    """
+    from ingestion.sources.base import CorpusDocument
+
+    if not documents:
+        return 0
+
+    client = get_client()
+    result = client.table("neighborhoods").select("id,name").execute()
+    name_to_id = {r["name"]: r["id"] for r in result.data}
+
+    rows = []
+    for doc in documents:
+        if not isinstance(doc, CorpusDocument):
+            continue
+        nbhd_id = name_to_id.get(doc.neighborhood)
+        if not nbhd_id:
+            logger.warning(
+                "write_corpus: no DB record for neighborhood %r — skipping", doc.neighborhood
+            )
+            continue
+        rows.append({
+            "neighborhood_id": nbhd_id,
+            "source": doc.source_id,
+            "content": doc.content,
+            "author": doc.author or None,
+            "external_url": doc.external_url or None,
+            "metadata": doc.metadata,
+        })
+
+    if rows:
+        client.table("reviews").insert(rows).execute()
+    logger.info("write_corpus: wrote %d review rows (%d skipped)", len(rows), len(documents) - len(rows))
+    return len(rows)
+
+
 def load_neighborhood_centroids() -> dict[str, tuple[float, float]]:
     """
     Read neighborhood centroids from GeoJSON (no DB round-trip).
