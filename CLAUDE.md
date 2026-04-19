@@ -122,23 +122,24 @@ explains *why* a neighborhood has that score using retrieved review text.
 
 ## Current Status
 - **Branch**: `poc`
-- **Sprint**: 2 [CURRENT]
-- **Sprint 1**: DONE (confirmed Apr 19) — pipeline runs end-to-end, 104 neighborhoods scored, data in Supabase
-- **Next**: RAG corpus (`yelp_reviews`, `reddit_posts`), embed with OpenAI text-embedding-3-small, store in `embeddings` table, build retrieval + LLM synthesis for neighborhood profiles
+- **Sprint 1**: DONE ✓ (confirmed Apr 19) — pipeline runs end-to-end, 104 neighborhoods scored, data in Supabase, Overpass caching in place
+- **Sprint 2**: [CURRENT] — RAG pipeline
+- **Next**: implement `yelp_reviews.fetch()` + `reddit_posts.fetch()`, wire corpus pipeline to `db.write_corpus()`, embed chunks with OpenAI text-embedding-3-small, build retrieval + LLM synthesis for neighborhood profiles
 
 ### Key Files
-| File | Role | Sprint | Status |
+| File | Role | Sprint | Notes |
 |---|---|---|---|
-| `ingestion/db.py` | Supabase I/O (seed, write_scores, load GDF/centroids) | 1 | Active |
-| `ingestion/sources/complaints_311.py` | City of Miami 311 NOISEVIO scoring (weight=0.3) | 1 | Active |
-| `ingestion/sources/osm_venues.py` | OSM venue density scoring (weight=0.5) | 1 | Active |
-| `ingestion/sources/osm_roads.py` | OSM weighted road-km scoring (weight=0.2) | 1 | Active |
-| `ingestion/pipeline.py` | Orchestrator + `run_and_persist()` entry point | 1 | Active |
-| `ingestion/score_engine.py` | Weighted composite score computation | 0 | Active |
-| `ingestion/sources/base.py` | `NoiseSource` ABC + `NeighborhoodScore` dataclass | 0 | Active |
-| `migrations/001_initial_schema.sql` | Supabase DDL (neighborhoods, noise_scores, reviews, embeddings) | 0 | Active |
-| `data/geojson/miami_neighborhoods.geojson` | 106 neighborhood polygons (WGS84) | 0 | Active |
-| `ingestion/sources/venue_density.py` | Google Places — deferred to Sprint 2, weight=0, disabled | 1 | Inactive |
+| `ingestion/sources/base.py` | `NoiseSource` ABC, `NeighborhoodScore`, `source_role` | 0 | Sprint 2 corpus sources inherit from this |
+| `ingestion/score_engine.py` | Weighted composite score computation | 0 | Stable — Sprint 2 won't touch |
+| `migrations/001_initial_schema.sql` | Supabase DDL (neighborhoods, noise_scores, reviews, embeddings) | 0 | Sprint 2 writes to reviews + embeddings tables |
+| `data/geojson/miami_neighborhoods.geojson` | 104 neighborhood polygons (WGS84) | 0 | Used by all spatial joins |
+| `ingestion/db.py` | Supabase I/O — seed, write_scores, load GDF/centroids | 1 | Sprint 2 adds write_corpus() here |
+| `ingestion/pipeline.py` | Orchestrator — scoring/corpus split, run_and_persist() | 1 | Sprint 2 wires corpus results to db.write_corpus() |
+| `ingestion/sources/complaints_311.py` | City of Miami 311 NOISEVIO — corpus source | 1 | First corpus source Sprint 2 will persist |
+| `ingestion/sources/osm_venues.py` | OSM venue density — scoring (w=0.6), 1-day cache | 1 | Sprint 2 RAG narratives reference venue counts |
+| `ingestion/sources/osm_roads.py` | OSM weighted road-km — scoring (w=0.4), 7-day cache | 1 | Sprint 2 RAG narratives reference road signal |
+| `ingestion/sources/venue_density.py` | Google Places — corpus, Sprint 2 enrichment | 1 | Activate in Sprint 2 for cross-validation |
+| `tasks/lessons.md` | Sprint lessons log (10 entries from Sprint 1) | 1 | Read at session start |
 
 > NEVER update sprint status or this table without Luna's explicit confirmation (Sprint Completion Protocol above).
 
@@ -197,6 +198,11 @@ This is the record of *why* the codebase looks the way it does. Never silently r
 | Apr 17, 2026 | 1 | `osm_roads.py` — OSMRoadNoise (weight=0.2) | OSM weighted road-km replaces TomTom for PoC; motorway×3.0 → primary×1.0 weights reflect dB contribution; clipped to neighborhood polygons in UTM 17N |
 | Apr 17, 2026 | 1 | `complaints_311.py` rewritten to City of Miami 311 NOISEVIO (weight=0.3) | Miami-Dade 311 has no noise category; Code Compliance violations are geographically mismatched (lat 25.51–25.72 vs. City of Miami lat 25.73–25.85) |
 | Apr 17, 2026 | 1 | `venue_density.py` weight 1.0 → 0.0 | OSMVenueDensity takes over primary venue scoring; Google Places deferred to Sprint 2 for cross-validation |
+| Apr 19, 2026 | 1 | `source_role` added to `NoiseSource` — "scoring" \| "corpus" \| "both" | `weight` was overloaded; explicit role cleanly separates score contributors from RAG corpus feeders |
+| Apr 19, 2026 | 1 | `complaints_311` moved to corpus role; osm_venues w=0.6, osm_roads w=0.4 | 578 all-time records too thin/stale to score reliably; OSM sources carry full scoring weight |
+| Apr 19, 2026 | 1 | Local GeoPackage cache for osm_roads (7d) and osm_venues (1d) | Overpass public endpoints timeout under load; cache makes pipeline reliable regardless of API availability |
+| Apr 19, 2026 | 1 | User-Agent header added to all Overpass requests | overpass-api.de returns 406 without it; silently rejected at gateway with no useful error |
+| Apr 19, 2026 | 1 | `gpd.overlay` argument order fixed (roads as df1, not neighborhoods) | keep_geom_type=True with polygon df1 dropped all LineString clippings → zero scores |
 
 ---
 

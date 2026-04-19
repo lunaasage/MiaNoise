@@ -2,7 +2,7 @@
 
 ---
 
-## Sprint 1 — Data Ingestion + Score Engine [DONE — pending Luna confirmation]
+## Sprint 1 — Data Ingestion + Score Engine [DONE ✓ confirmed Apr 19]
 
 **Goal:** `python -m ingestion.pipeline` produces real composite noise scores for all neighborhoods, written to Supabase.
 
