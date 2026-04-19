@@ -1,6 +1,4 @@
 import logging
-import os
-from datetime import datetime, timedelta, timezone
 
 import geopandas as gpd
 import pandas as pd
@@ -83,14 +81,13 @@ class Complaints311(NoiseSource):
         ]
 
     def _fetch_all_records(self) -> list[dict]:
-        """Fetch City of Miami NOISEVIO records from the last 12 months, paginated."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=365)).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
-        where = (
-            f"issue_type = 'NOISEVIO' "
-            f"AND ticket_created_date_time >= TIMESTAMP '{cutoff}'"
-        )
+        """Fetch all City of Miami NOISEVIO records, paginated.
+
+        No date filter: the dataset last updated August 2024 and the ArcGIS
+        endpoint rejects epoch-ms comparisons, so we use all 578 historical
+        records. The spatial join still provides neighborhood-level signal.
+        """
+        where = "issue_type = 'NOISEVIO'"
 
         records, offset = [], 0
         while True:
@@ -119,7 +116,7 @@ class Complaints311(NoiseSource):
                 break
             offset += PAGE_SIZE
 
-        logger.info("complaints_311: %d NOISEVIO records (last 12 months)", len(records))
+        logger.info("complaints_311: %d NOISEVIO records (all time)", len(records))
         return records
 
     @staticmethod

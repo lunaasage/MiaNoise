@@ -10,7 +10,10 @@ from .base import NeighborhoodScore, NoiseSource
 
 logger = logging.getLogger(__name__)
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
 
 # Noise weight per road type. Motorways generate ~3× the noise energy of a
 # primary road at equivalent traffic; weights reflect approximate dB contribution.
@@ -97,15 +100,18 @@ class OSMRoadNoise(NoiseSource):
 );
 out geom;
 """
-        try:
-            resp = requests.post(
-                OVERPASS_URL, data={"data": query}, timeout=120
-            )
-            resp.raise_for_status()
-            elements = resp.json().get("elements", [])
-            logger.info("osm_roads: %d road elements from Overpass", len(elements))
-        except Exception as exc:
-            logger.warning("osm_roads: Overpass query failed: %s", exc)
+        elements = None
+        for url in OVERPASS_ENDPOINTS:
+            try:
+                resp = requests.post(url, data={"data": query}, timeout=120)
+                resp.raise_for_status()
+                elements = resp.json().get("elements", [])
+                logger.info("osm_roads: %d road elements from %s", len(elements), url)
+                break
+            except Exception as exc:
+                logger.warning("osm_roads: %s failed: %s — trying next", url, exc)
+        if elements is None:
+            logger.warning("osm_roads: all Overpass endpoints failed")
             return gpd.GeoDataFrame()
 
         rows = []

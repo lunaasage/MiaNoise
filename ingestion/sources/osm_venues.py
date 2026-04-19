@@ -10,7 +10,10 @@ from .base import NeighborhoodScore, NoiseSource
 
 logger = logging.getLogger(__name__)
 
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+]
 
 # Venue types that drive nighttime noise
 VENUE_AMENITIES = ["bar", "nightclub", "restaurant"]
@@ -93,17 +96,17 @@ class OSMVenueDensity(NoiseSource):
 );
 out center;
 """
-        try:
-            resp = requests.post(
-                OVERPASS_URL, data={"data": query}, timeout=120
-            )
-            resp.raise_for_status()
-            elements = resp.json().get("elements", [])
-            logger.info("osm_venues: %d elements from Overpass", len(elements))
-            return elements
-        except Exception as exc:
-            logger.warning("osm_venues: Overpass query failed: %s", exc)
-            return []
+        for url in OVERPASS_ENDPOINTS:
+            try:
+                resp = requests.post(url, data={"data": query}, timeout=120)
+                resp.raise_for_status()
+                elements = resp.json().get("elements", [])
+                logger.info("osm_venues: %d elements from %s", len(elements), url)
+                return elements
+            except Exception as exc:
+                logger.warning("osm_venues: %s failed: %s — trying next", url, exc)
+        logger.warning("osm_venues: all Overpass endpoints failed")
+        return []
 
     @staticmethod
     def _to_points(elements: list[dict]) -> list[dict]:

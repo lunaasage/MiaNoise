@@ -25,6 +25,9 @@ class VenueDensity(NoiseSource):
     weight = 0.0  # OSMVenueDensity is the primary venue scorer; this is Sprint 2 enrichment only
     required_env_vars = ["GOOGLE_PLACES_API_KEY"]
 
+    def is_available(self) -> bool:
+        return False  # deferred to Sprint 2; OSMVenueDensity handles venue scoring for PoC
+
     def fetch(self) -> list[NeighborhoodScore]:
         api_key = os.environ["GOOGLE_PLACES_API_KEY"]
         centroids = load_neighborhood_centroids()
