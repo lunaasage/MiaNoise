@@ -5,6 +5,7 @@ class TomTomTraffic(NoiseSource):
     """TomTom Traffic API — road traffic volume as a proxy for traffic noise."""
 
     source_id = "tomtom_traffic"
+    source_role = "scoring"
     weight = 0.2  # placeholder — calibrate once all full-version sources are active
     required_env_vars = ["TOMTOM_API_KEY"]
 

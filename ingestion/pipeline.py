@@ -27,6 +27,15 @@ def _fetch_results(
     return results
 
 
+def _split_by_role(
+    active: list[NoiseSource],
+) -> tuple[list[NoiseSource], list[NoiseSource]]:
+    """Split active sources into (scoring, corpus) lists based on source_role."""
+    scoring = [s for s in active if s.source_role in ("scoring", "both")]
+    corpus  = [s for s in active if s.source_role in ("corpus",  "both")]
+    return scoring, corpus
+
+
 def run_pipeline() -> dict[str, float]:
     """
     Run the ingestion pipeline without any DB writes.
@@ -34,15 +43,18 @@ def run_pipeline() -> dict[str, float]:
     Safe to call in tests and scripts that don't need persistence.
     """
     sources = [cls() for cls in ALL_SOURCES]
-    active = [s for s in sources if s.is_available()]
+    active  = [s for s in sources if s.is_available()]
 
     if not active:
         logger.warning("No sources available — check your .env")
         return {}
 
-    logger.info("Active sources: %s", [s.source_id for s in active])
-    results = _fetch_results(active)
-    return compute_composite_scores(results, active)
+    scoring, corpus = _split_by_role(active)
+    logger.info("Scoring sources: %s", [s.source_id for s in scoring])
+    logger.info("Corpus sources:  %s", [s.source_id for s in corpus])
+
+    scoring_results = _fetch_results(scoring)
+    return compute_composite_scores(scoring_results, scoring)
 
 
 def run_and_persist() -> dict[str, float]:
@@ -51,10 +63,9 @@ def run_and_persist() -> dict[str, float]:
 
     Steps:
       1. Seed neighborhoods table from GeoJSON (idempotent upsert)
-      2. Fetch from all available sources
-      3. Compute composite scores
-      4. Write scores to noise_scores table
-      5. Return composite scores
+      2. Fetch scoring sources → compute composite scores → write to noise_scores
+      3. Fetch corpus sources → log results (Sprint 2 will write to reviews table)
+      4. Return composite scores
 
     Requires SUPABASE_URL and SUPABASE_SERVICE_KEY in the environment.
     """
@@ -63,21 +74,33 @@ def run_and_persist() -> dict[str, float]:
     db.seed_neighborhoods()
 
     sources = [cls() for cls in ALL_SOURCES]
-    active = [s for s in sources if s.is_available()]
+    active  = [s for s in sources if s.is_available()]
 
     if not active:
         logger.warning("No sources available — check your .env")
         return {}
 
-    logger.info("Active sources: %s", [s.source_id for s in active])
-    results = _fetch_results(active)
-    composite = compute_composite_scores(results, active)
+    scoring, corpus = _split_by_role(active)
+    logger.info("Scoring sources: %s", [s.source_id for s in scoring])
+    logger.info("Corpus sources:  %s", [s.source_id for s in corpus])
+
+    scoring_results = _fetch_results(scoring)
+    composite = compute_composite_scores(scoring_results, scoring)
 
     per_source = {
         source_id: {r.neighborhood: r.normalized_score for r in readings}
-        for source_id, readings in results.items()
+        for source_id, readings in scoring_results.items()
     }
     db.write_scores(composite, per_source)
+
+    # Corpus sources: fetch and hold — Sprint 2 will write these to the reviews table
+    corpus_results = _fetch_results(corpus)
+    if corpus_results:
+        logger.info(
+            "Corpus data collected from %s — Sprint 2 will persist to reviews table",
+            list(corpus_results),
+        )
+
     return composite
 
 

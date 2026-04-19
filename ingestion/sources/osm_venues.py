@@ -31,7 +31,8 @@ class OSMVenueDensity(NoiseSource):
     """
 
     source_id = "osm_venues"
-    weight = 0.5
+    source_role = "scoring"
+    weight = 0.6
     required_env_vars = []
 
     def fetch(self) -> list[NeighborhoodScore]:

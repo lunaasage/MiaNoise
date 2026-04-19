@@ -166,6 +166,11 @@ On confirmation:
 - `tasks/lessons.md` — updated after every correction or unexpected finding. Read at session start.
 - `tasks/todo.md` — current sprint task list. Updated when direction changes are confirmed.
 
+### Direction Changes (MANDATORY audit trail)
+When an approach is abandoned mid-sprint in favor of a different one, log it in `tasks/todo.md` under the relevant task:
+> "Tried X → didn't work because Y → discussed with Luna → going with Z instead"
+This is the record of *why* the codebase looks the way it does. Never silently replace an approach without logging the pivot.
+
 ### No Guessing
 - Never hardcode a value that can be queried or derived
 - When data behaves unexpectedly (zero rows, wrong geography, stale dates): investigate before assuming the code is wrong

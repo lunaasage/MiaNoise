@@ -26,20 +26,26 @@ class NoiseSource(ABC):
     """
     Abstract base for all noise data sources.
 
-    Subclasses declare source_id, weight, and required_env_vars as class
-    variables, then implement fetch(). The pipeline calls fetch_safe(), which
-    handles availability checks and runtime errors so a broken source never
+    source_role determines how the pipeline uses a source's output:
+      "scoring" — output goes to score_engine → composite noise score
+      "corpus"  — output goes to the RAG corpus (reviews/embeddings tables)
+      "both"    — output goes to both pipelines
+
+    Subclasses set source_id, source_role, weight (scoring only), and
+    required_env_vars. The pipeline calls fetch_safe(), which handles
+    availability checks and runtime errors so a broken source never
     takes down the pipeline.
 
     To add a new source:
       1. Create ingestion/sources/<name>.py
-      2. Subclass NoiseSource, set source_id / weight / required_env_vars
+      2. Subclass NoiseSource, set source_id / source_role / weight / required_env_vars
       3. Implement fetch() — return one NeighborhoodScore per neighborhood
       4. Add the class to ALL_SOURCES in ingestion/sources/__init__.py
     """
 
     source_id: ClassVar[str]
-    weight: ClassVar[float] = 1.0
+    source_role: ClassVar[str] = "scoring"  # "scoring" | "corpus" | "both"
+    weight: ClassVar[float] = 1.0           # only meaningful for scoring/both sources
     required_env_vars: ClassVar[list[str]] = []
 
     def is_available(self) -> bool:

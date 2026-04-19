@@ -5,7 +5,7 @@ class YelpReviews(NoiseSource):
     """Yelp Fusion API — business review text for RAG corpus; noise signal from review sentiment."""
 
     source_id = "yelp_reviews"
-    weight = 0.0  # contributes to RAG corpus, not directly to composite score
+    source_role = "corpus"
     required_env_vars = ["YELP_API_KEY"]
 
     def fetch(self) -> list[NeighborhoodScore]:

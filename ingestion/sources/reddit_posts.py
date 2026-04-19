@@ -5,7 +5,7 @@ class RedditPosts(NoiseSource):
     """Reddit PRAW — r/miami and r/MiamiBeach noise anecdotes for RAG corpus."""
 
     source_id = "reddit_posts"
-    weight = 0.0  # contributes to RAG corpus, not directly to composite score
+    source_role = "corpus"
     required_env_vars = [
         "REDDIT_CLIENT_ID",
         "REDDIT_CLIENT_SECRET",

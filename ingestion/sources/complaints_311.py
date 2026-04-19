@@ -25,8 +25,8 @@ class Complaints311(NoiseSource):
     """City of Miami 311 — noise violation service requests (NOISEVIO) per neighborhood."""
 
     source_id = "complaints_311"
-    weight = 0.3
-    required_env_vars = []  # public dataset — no key required
+    source_role = "corpus"  # complaint records feed RAG; too thin/stale to score reliably
+    required_env_vars = []
 
     def fetch(self) -> list[NeighborhoodScore]:
         neighborhoods = load_neighborhood_geodataframe()[["name", "geometry"]]

@@ -5,6 +5,7 @@ class OpenSkyFlights(NoiseSource):
     """OpenSky Network — overflight frequency over Miami neighborhoods."""
 
     source_id = "opensky_flights"
+    source_role = "scoring"
     weight = 0.15  # placeholder — calibrate once all full-version sources are active
     required_env_vars = ["OPENSKY_USERNAME", "OPENSKY_PASSWORD"]
 

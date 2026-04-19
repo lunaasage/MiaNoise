@@ -39,7 +39,8 @@ class OSMRoadNoise(NoiseSource):
     """
 
     source_id = "osm_roads"
-    weight = 0.2
+    source_role = "scoring"
+    weight = 0.4
     required_env_vars = []
 
     def fetch(self) -> list[NeighborhoodScore]:

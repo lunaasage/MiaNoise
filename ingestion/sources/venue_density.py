@@ -22,11 +22,8 @@ class VenueDensity(NoiseSource):
     """Google Places API (New) — nightlife venue density per neighborhood."""
 
     source_id = "venue_density"
-    weight = 0.0  # OSMVenueDensity is the primary venue scorer; this is Sprint 2 enrichment only
+    source_role = "corpus"  # Sprint 2 enrichment — cross-validates OSMVenueDensity
     required_env_vars = ["GOOGLE_PLACES_API_KEY"]
-
-    def is_available(self) -> bool:
-        return False  # deferred to Sprint 2; OSMVenueDensity handles venue scoring for PoC
 
     def fetch(self) -> list[NeighborhoodScore]:
         api_key = os.environ["GOOGLE_PLACES_API_KEY"]
