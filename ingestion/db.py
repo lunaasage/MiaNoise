@@ -189,6 +189,31 @@ def load_neighborhood_centroids() -> dict[str, tuple[float, float]]:
     return result
 
 
+def load_all_profiles() -> list[dict]:
+    """Return all pre-generated profiles as [{neighborhood_name, profile_text}]."""
+    client = get_client()
+    result = client.table("latest_profiles").select("neighborhood_name,profile_text").execute()
+    return result.data
+
+
+def load_neighborhood_reviews(neighborhood_name: str) -> list[str]:
+    """Return all review content texts for a neighborhood."""
+    client = get_client()
+    nbhd = client.table("neighborhoods").select("id").eq("name", neighborhood_name).execute()
+    if not nbhd.data:
+        return []
+    nbhd_id = nbhd.data[0]["id"]
+    result = client.table("reviews").select("content").eq("neighborhood_id", nbhd_id).execute()
+    return [r["content"] for r in result.data]
+
+
+def load_latest_scores() -> dict[str, float]:
+    """Return {neighborhood_name: composite_score} from the latest_noise_scores view."""
+    client = get_client()
+    result = client.table("latest_noise_scores").select("neighborhood_name,composite_score").execute()
+    return {r["neighborhood_name"]: r["composite_score"] for r in result.data}
+
+
 def load_neighborhood_geodataframe() -> gpd.GeoDataFrame:
     """Load GeoJSON as a WGS84 GeoDataFrame. Used by spatial-join sources."""
     return gpd.read_file(GEOJSON_PATH).to_crs("EPSG:4326")
