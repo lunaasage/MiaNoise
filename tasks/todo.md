@@ -58,10 +58,32 @@
 
 ### Tasks
 
-- [ ] **3.1** Pre-generate profiles at pipeline time — run synthesizer for all 59 neighborhoods with venues, store `profile_text` in Supabase (new column or table)
-- [ ] **3.2** Build LangChain agent with Groq (Llama 3.1 70B) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews`
+- [x] **3.1** Pre-generate profiles at pipeline time — run synthesizer for all 58 neighborhoods with venues, store `profile_text` in Supabase (profiles table + latest_profiles view). **58 profiles written, 5–22 chunks each. [DONE ✓ Apr 19]**
+- [ ] **3.2** Build LangChain agent (OpenAI gpt-4o-mini, swapped from Groq — see direction change below) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews`
 - [ ] **3.3** Streamlit UI — Folium choropleth map, click-to-profile (reads from DB), chat interface (calls agent)
 - [ ] **3.4** End-to-end test — "find me a quiet neighborhood" returns ranked list with profiles; map click shows Wynwood profile
+
+### Direction Changes — Sprint 3.2 (confirmed Apr 21)
+
+**Agent LLM: Groq → OpenAI gpt-4o-mini:**
+- **Problem:** Groq free tier caps at 100K tokens/day. Agent loops re-send full context on every internal call (~5–7K tokens/question). 15–20 questions blows the cap. Dev tier unavailable.
+- **Fix:** Switched to `ChatOpenAI(gpt-4o-mini)`. Consolidates on provider already used for embeddings + synthesis. Pennies at PoC scale, far higher limits.
+
+**Profile coverage gap — 48 missing neighborhoods:**
+- **Problem:** `generate_all_profiles()` iterated `reviews` table → only 58 neighborhoods with venue reviews got profiles. 48 quiet residential neighborhoods had no profile, breaking "find me a quiet neighborhood" queries.
+- **Fix:** Changed to iterate `neighborhoods` table directly (all 104). Data-sparse neighborhoods get score-only profiles from composite score + source_scores. 104/104 now covered.
+
+**Agent reliability fixes:**
+- `_resolve_name()` — fuzzy name resolution: exact match → partial match → rank by review count (fixes "Brickell" → "Brickell Residential District" instead of "Brickell Village")
+- System prompt rewritten to allow `get_profile` + `search_reviews` on same turn for timing-qualified questions
+- Exception handling with explicit RateLimitError + GraphRecursionError user-facing messages
+
+### Direction Changes — Sprint 3.1 (confirmed Apr 19)
+
+**Geographic bleed bug:**
+- **Problem:** `GooglePlacesReviews` used `_compute_radii()` (circumradius from centroid to polygon vertex) → Edgewater circumradius = 1205m, extending 640m into Wynwood. Edgewater profiles showed Wynwood venues (Perro Negro, The White Elephant, Barcelona Wine Bar).
+- **Fix:** Rewrote to OSM venue-anchored search. Load OSM venue cache (`data/cache/osm_venues_miami.gpkg`), spatial join venues to neighborhood polygons (`predicate="within"`), search Google Places at each venue's exact coordinates with 100m radius. Neighborhood tag comes from spatial containment, not search geometry. 714 venues → 351 matched across 59 neighborhoods. Edgewater/Wynwood cleanly separated.
+- **Also fixed:** `run_and_persist()` was missing `embed_all()` call between `write_corpus()` and `generate_all_profiles()`. All 58 initial profiles generated with 0 chunks. Fix: added `embed_all()` step in `pipeline.py`.
 
 ---
 

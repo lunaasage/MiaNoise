@@ -115,6 +115,10 @@ def run_and_persist() -> dict[str, float]:
             len(corpus),
         )
 
+    from rag.embedder import embed_all
+    embedded = embed_all()
+    logger.info("Embedder: embedded %d new reviews", embedded)
+
     from rag.synthesizer import generate_all_profiles
     generate_all_profiles()
 

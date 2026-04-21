@@ -19,6 +19,7 @@ openai==1.35.0
 langchain==0.2.6
 langchain-anthropic==0.1.19
 langchain-openai==0.1.14
+langchain-groq
 langchain-community==0.2.6
 
 # Data sources

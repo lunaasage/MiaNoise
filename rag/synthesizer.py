@@ -138,7 +138,18 @@ def generate_profile(neighborhood_name: str) -> str:
 
 def generate_all_profiles() -> int:
     """
-    Generate and store profiles for every neighborhood that has embeddings.
+    Generate and store profiles for ALL neighborhoods — not just those with reviews.
+
+    Neighborhoods without OSM venues (residential, parks, water) have zero reviews
+    and therefore zero embeddings. Previously those were skipped entirely, leaving
+    the agent unable to answer "find me a quiet neighborhood" questions — precisely
+    the neighborhoods a renter looking for quiet cares about.
+
+    For these data-sparse neighborhoods, generate_profile() will produce a
+    score-only narrative grounded in the composite noise score + source_scores
+    (venue density = 0, road noise, etc.) with no review chunks. The profile is
+    shorter and less textured, but it's real information, not a dead end.
+
     Called by pipeline.run_and_persist() at the end of each nightly run.
     Returns number of profiles written.
     """
@@ -147,30 +158,11 @@ def generate_all_profiles() -> int:
 
     db = get_client()
 
-    # Query distinct neighborhood names via reviews table — one row per review,
-    # but we only need unique names. Paginate to avoid the 1000-row default limit.
-    PAGE = 1000
-    seen: set[str] = set()
-    names: list[str] = []
-    offset = 0
-    while True:
-        batch = (
-            db.table("reviews")
-            .select("neighborhood_id, neighborhoods(name)")
-            .range(offset, offset + PAGE - 1)
-            .execute()
-            .data
-        )
-        for row in batch:
-            name = (row.get("neighborhoods") or {}).get("name")
-            if name and name not in seen:
-                seen.add(name)
-                names.append(name)
-        if len(batch) < PAGE:
-            break
-        offset += PAGE
+    # Pull all neighborhoods — 106 rows, single query, no pagination needed
+    result = db.table("neighborhoods").select("name").execute()
+    names = [r["name"] for r in result.data]
 
-    logger.info("synthesizer: generating profiles for %d neighborhoods", len(names))
+    logger.info("synthesizer: generating profiles for %d neighborhoods (all)", len(names))
     written = 0
     for name in names:
         try:

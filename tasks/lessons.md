@@ -76,3 +76,22 @@ Read this at the start of every session. Update after every correction or unexpe
 **What happened:** Anthropic was in the stack for synthesis while OpenAI was already in the stack for embeddings. No good reason to run two paid LLM providers.
 **Lesson:** Each provider = another API key, billing account, SDK dependency, and failure mode. OpenAI GPT-4o-mini handles synthesis as well as Claude Sonnet for this task, at lower cost, with no new integration needed.
 **Rule:** Default to the provider already in the stack unless there's a specific capability gap.
+
+---
+
+## Sprint 3
+
+### L14 — Circumradius-based geographic search causes boundary bleed for elongated polygons
+**What happened:** `GooglePlacesReviews` computed each neighborhood's circumradius (max distance from centroid to any polygon vertex) and used it as the search radius. Edgewater is a thin waterfront strip — its circumradius is 1205m but its actual width is ~400m. The search circle extended 640m into Wynwood, causing Edgewater profiles to cite Wynwood venues.
+**Lesson:** For neighborhood-anchored searches, circumradius is wrong for any non-circular polygon. Use venue-anchored search instead: load pre-mapped OSM venues, spatial-join them to neighborhoods (polygon containment), then search at each venue's exact coordinates with a tight radius (100m). Neighborhood assignment comes from the spatial join, not the search geometry — authoritative regardless of polygon shape.
+**Rule:** Never use centroid + circumradius for geographic search boundaries. Use spatial containment to assign neighborhood, not search geometry.
+
+### L15 — Verify full pipeline step order before calling it done
+**What happened:** `run_and_persist()` called `write_corpus()` → `generate_all_profiles()` with no `embed_all()` in between. All 58 profiles were generated with 0 review chunks because reviews existed in the reviews table but had no embeddings yet. The profiles silently succeeded — they just contained no grounding.
+**Lesson:** Pipeline functions that produce downstream artifacts need explicit, ordered calls. `write_corpus` → `embed_all` → `generate_all_profiles` is a hard dependency chain. Missing the middle step produces silent failure: no error, wrong output.
+**Rule:** After adding any pipeline step, trace the full call chain end-to-end and verify each step's output before the next step's input.
+
+### L16 — Groq free tier is incompatible with agent loops at any real usage volume
+**What happened:** Groq free tier caps at 100K tokens/day. LangGraph agent loops re-send full conversation context on every internal LLM call — a single user question consumes ~5–7K tokens across multiple hops. 15–20 user questions blow the daily cap. Switching to Groq dev tier was not available at the time.
+**Lesson:** Free-tier LLMs work for one-off inference (profile synthesis, a few test calls) but fail immediately for agentic loops, which multiply token consumption by ~5x vs naive estimates. Always estimate token usage accounting for agent loop overhead before committing to a provider.
+**Rule:** For any agent loop, assume 5–10× token multiplier vs. single-turn. Size the provider tier accordingly before building. Default to the provider already in the stack (OpenAI was already used for embeddings + synthesis) rather than adding a new one for cost reasons that evaporate at PoC scale.
