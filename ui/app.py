@@ -1,7 +1,6 @@
 """
 MiaNoise — Streamlit dashboard
-Three tabs: Map · Neighborhood Profiles · Compare & Temporal
-Floating chat widget (FAB) accessible from all tabs.
+Four tabs: Map · Neighborhood Profiles · Compare & Temporal · Chat with MiaNoise
 
 Run from the project root:
     streamlit run ui/app.py
@@ -70,8 +69,6 @@ def _agent():
 
 if "selected" not in st.session_state:
     st.session_state.selected = None
-if "chat_open" not in st.session_state:
-    st.session_state.chat_open = False
 if "messages" not in st.session_state:
     st.session_state.messages = []       # display messages [{role, content}]
 if "agent_history" not in st.session_state:
@@ -145,10 +142,11 @@ st.caption("Miami neighborhood noise intelligence for renters.")
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 
-tab_map, tab_profiles, tab_compare = st.tabs([
+tab_map, tab_profiles, tab_compare, tab_chat = st.tabs([
     "Map",
     "Neighborhood Profiles",
     "Compare & Temporal",
+    "Chat with MiaNoise",
 ])
 
 
@@ -362,100 +360,46 @@ with tab_compare:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FLOATING CHAT WIDGET — visible across all tabs
+# TAB 4 — CHAT WITH MIANOISE
 # ══════════════════════════════════════════════════════════════════════════════
-#
-# Technique: inject a unique DOM marker via st.markdown, then use CSS
-# :has(> #marker) ~ sibling selectors to position the FAB and panel as
-# position:fixed overlays. Works in all modern browsers (Chrome 105+,
-# Firefox 121+, Safari 15.4+) via CSS :has() support.
 
-st.markdown("""
-<style>
-/* ── FAB button ─────────────────────────────────────────────────────── */
-div:has(> #chat-fab-marker) ~ div[data-testid="stButton"] button {
-    position: fixed !important;
-    bottom: 28px !important;
-    right: 28px !important;
-    width: 60px !important;
-    height: 60px !important;
-    border-radius: 50% !important;
-    background: #ff4b4b !important;
-    color: white !important;
-    border: none !important;
-    font-size: 1.5rem !important;
-    box-shadow: 0 4px 20px rgba(255,75,75,0.45) !important;
-    cursor: pointer !important;
-    z-index: 9999 !important;
-    padding: 0 !important;
-    line-height: 60px !important;
-}
+with tab_chat:
+    st.subheader("Chat with MiaNoise")
+    st.caption(
+        'e.g. "Find me a quiet neighborhood near Brickell"  ·  '
+        '"Which areas have the most nightlife noise?"  ·  '
+        '"Is Wynwood loud on weekdays?"'
+    )
 
-/* ── Chat panel container ────────────────────────────────────────────── */
-div:has(> #chat-fab-marker) ~ div[data-testid="stVerticalBlock"] {
-    position: fixed !important;
-    bottom: 100px !important;
-    right: 28px !important;
-    width: 380px !important;
-    background: white !important;
-    border-radius: 16px !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.22) !important;
-    z-index: 9998 !important;
-    overflow: hidden !important;
-    padding: 0 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# DOM marker — siblings after this get the fixed positioning above
-st.markdown('<span id="chat-fab-marker"></span>', unsafe_allow_html=True)
-
-# FAB toggle button
-fab_label = "✕" if st.session_state.chat_open else "💬"
-if st.button(fab_label, key="chat_fab", help="Ask about Miami noise levels"):
-    st.session_state.chat_open = not st.session_state.chat_open
-    st.rerun()
-
-# Chat panel — only rendered when open
-if st.session_state.chat_open:
-    with st.container():
-        # Header
-        st.markdown(
-            "<div style='padding:14px 16px 10px; border-bottom:1px solid #f0f0f0;'>"
-            "<strong style='font-size:15px'>Ask about Miami noise</strong><br>"
-            "<span style='font-size:12px; color:#888'>"
-            'e.g. &ldquo;Find me a quiet area near Brickell&rdquo;</span>'
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        # Message history
-        history_box = st.container(height=300)
-        with history_box:
-            if not st.session_state.messages:
-                st.caption("Ask about any Miami neighborhood…")
-            for msg in st.session_state.messages:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-
-        # Input form — clear_on_submit keeps the box empty after sending
-        with st.form("chat_form", clear_on_submit=True):
+    # Input at the top — always visible, never scrolls away
+    with st.form("chat_form", clear_on_submit=True):
+        col_input, col_btn = st.columns([5, 1])
+        with col_input:
             user_input = st.text_input(
                 "",
-                placeholder="Ask about noise levels…",
+                placeholder="Ask about noise levels in any Miami neighborhood…",
                 label_visibility="collapsed",
-                key="chat_input_field",
             )
+        with col_btn:
             submitted = st.form_submit_button("Send", use_container_width=True)
 
-        if submitted and user_input.strip():
-            prompt = user_input.strip()
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.spinner("Thinking…"):
-                agent = _agent()
-                response, updated_history = ask(
-                    agent, prompt, st.session_state.agent_history
-                )
-            st.session_state.messages.append({"role": "assistant", "content": response})
-            st.session_state.agent_history = updated_history
-            st.rerun()
+    if submitted and user_input.strip():
+        prompt = user_input.strip()
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.spinner("Thinking…"):
+            agent = _agent()
+            response, updated_history = ask(
+                agent, prompt, st.session_state.agent_history
+            )
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        st.session_state.agent_history = updated_history
+        st.rerun()
+
+    # Messages below the input box
+    st.divider()
+    if not st.session_state.messages:
+        st.caption("Your conversation will appear here.")
+    else:
+        for msg in reversed(st.session_state.messages):
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
