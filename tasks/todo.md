@@ -61,7 +61,11 @@
 - [x] **3.1** Pre-generate profiles at pipeline time — run synthesizer for all 58 neighborhoods with venues, store `profile_text` in Supabase (profiles table + latest_profiles view). **58 profiles written, 5–22 chunks each. [DONE ✓ Apr 19]**
 - [x] **3.2** Build LangChain agent (OpenAI gpt-4o-mini, swapped from Groq — see direction change below) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews`. **Agent live, 104/104 neighborhood profiles, nuanced grounded answers validated. [DONE ✓ Apr 21]**
 - [x] **3.3** Streamlit UI — 4-tab dashboard (Map, Profiles, Compare & Temporal, Chat with MiaNoise) live on poc. Chat tab wired to 3.2 agent; input pinned at top, messages below. **[DONE ✓ Apr 21]**
-- [ ] **3.4** End-to-end test — "find me a quiet neighborhood" returns ranked list with profiles; map click shows Wynwood profile
+- [ ] **3.4** End-to-end validation + prompt tuning
+  - Run test queries through the live UI: "find me a quiet neighborhood", "is Wynwood loud on weekdays?", map click on Wynwood
+  - Evaluate answer quality: grounded in data? cites score? concise? no hallucinated venues?
+  - Iterate on system prompt (`agent/agent.py`) and tool descriptions (`agent/tools.py`) until answers are consistently correct and well-reasoned
+  - Document what changed and why in `tasks/todo.md` direction changes
 
 ### Direction Changes — Sprint 3.3 (Apr 21)
 
