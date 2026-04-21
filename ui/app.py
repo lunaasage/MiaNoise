@@ -28,7 +28,7 @@ from ingestion.db import (
     load_neighborhood_reviews,
 )
 from ui.map_builder import build_map
-from agent.executor import get_agent_response
+from agent.executor import get_agent, ask
 
 
 st.set_page_config(
@@ -60,13 +60,19 @@ def _all_profiles():
 def _reviews(name: str):
     return load_neighborhood_reviews(name)
 
+@st.cache_resource
+def _agent():
+    return get_agent()
+
 
 # ── Session state ──────────────────────────────────────────────────────────────
 
 if "selected" not in st.session_state:
     st.session_state.selected = None
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = []       # display messages [{role, content}]
+if "agent_history" not in st.session_state:
+    st.session_state.agent_history = []  # LangChain message objects for multi-turn context
 
 
 # ── Shared data ────────────────────────────────────────────────────────────────
@@ -376,8 +382,12 @@ with tab_chat:
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
-                response = get_agent_response(prompt)
+                agent = _agent()
+                response, updated_history = ask(
+                    agent, prompt, st.session_state.agent_history
+                )
             st.markdown(response)
 
         st.session_state.messages.append({"role": "assistant", "content": response})
+        st.session_state.agent_history = updated_history
         st.rerun()

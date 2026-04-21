@@ -1,15 +1,10 @@
 """
-MiaNoise conversational agent entry point.
+MiaNoise agent executor — stable interface for the Streamlit UI.
 
-Sprint 3.2 stub — the LangChain/Groq implementation will replace get_agent_response()
-here once Sprint 3.2 is merged. The UI imports only this function.
+Thin wrapper around agent.agent so app.py imports one place and
+the internals can change without touching the UI.
 """
 
+from agent.agent import ask, get_agent
 
-def get_agent_response(query: str) -> str:
-    """Send a natural-language query to the agent and return its response."""
-    # Sprint 3.2 will wire in LangChain AgentExecutor + Groq here.
-    return (
-        "The conversational agent is coming in Sprint 3.2. "
-        "For now, click any neighborhood on the map to read its pre-generated noise profile."
-    )
+__all__ = ["get_agent", "ask"]
