@@ -125,26 +125,33 @@ explains *why* a neighborhood has that score using retrieved review text.
 - **Branch**: `poc`
 - **Sprint 1**: DONE ✓ (confirmed Apr 19) — pipeline runs end-to-end, 104 neighborhoods scored, data in Supabase, Overpass caching in place
 - **Sprint 2**: DONE ✓ (confirmed Apr 19) — 10,095 reviews collected, embedded, retrieval working, GPT-4o-mini profiles verified end-to-end
-- **Sprint 3**: [CURRENT] — Conversational agent + UI
-- **Next**: pre-generate profiles at pipeline time (store in DB), build LangChain agent with Groq, wire Streamlit UI (map + chat)
+- **Sprint 3**: DONE ✓ (confirmed Apr 21) — 4-tab Streamlit dashboard live: Map (Folium choropleth + click-to-profile), Neighborhood Profiles (searchable/filterable), Compare & Temporal (side-by-side + review keyword analysis), Chat with MiaNoise (LangChain agent, input pinned at top)
+- **Sprint 4**: [CURRENT] — Evaluation + polish
+- **Next**: RAGAS evaluation report, shareable URL
 
 ### Key Files
 | File | Role | Sprint | Notes |
 |---|---|---|---|
 | `ingestion/sources/base.py` | `NoiseSource` ABC, `NeighborhoodScore`, `CorpusDocument`, `source_role` | 0/2 | |
 | `ingestion/score_engine.py` | Weighted composite score computation | 0 | Stable |
-| `migrations/001_initial_schema.sql` | Supabase DDL — neighborhoods, noise_scores, reviews, embeddings | 0 | |
+| `migrations/001_initial_schema.sql` | Supabase DDL — neighborhoods, noise_scores, reviews, embeddings, latest_noise_scores view | 0 | |
 | `migrations/002_match_embeddings_rpc.sql` | pgvector cosine similarity RPC | 2 | Run in Supabase SQL editor |
+| `migrations/003_profiles_table.sql` | profiles table + latest_profiles view + RLS | 3 | Run in Supabase SQL editor |
 | `data/geojson/miami_neighborhoods.geojson` | 104 neighborhood polygons (WGS84) | 0 | Used by all spatial joins |
-| `ingestion/db.py` | Supabase I/O — seed, write_scores, write_corpus, load GDF/centroids | 1/2 | |
-| `ingestion/pipeline.py` | Orchestrator — scoring/corpus split, run_and_persist() | 1/2 | |
+| `ingestion/db.py` | Supabase I/O — seed, write_scores, write_corpus, write_profile, load_profile, load_all_profiles, load_neighborhood_reviews, load_latest_scores, load GDF/centroids | 1/2/3 | |
+| `ingestion/pipeline.py` | Orchestrator — scoring/corpus split, embed_all, generate_all_profiles, run_and_persist() | 1/2/3 | |
 | `ingestion/sources/osm_venues.py` | OSM venue density — scoring (w=0.6), 1-day cache | 1 | |
 | `ingestion/sources/osm_roads.py` | OSM weighted road-km — scoring (w=0.4), 7-day cache | 1 | |
 | `ingestion/sources/google_places_reviews.py` | Google Places review text — primary corpus source | 2 | 10,095 reviews across 58 neighborhoods |
 | `rag/embedder.py` | Batch embed reviews with text-embedding-3-small, idempotent | 2 | |
 | `rag/retriever.py` | pgvector cosine similarity retrieval, multi-query merge | 2 | |
-| `rag/synthesizer.py` | GPT-4o-mini profile generation from retrieved chunks + scores | 2 | |
-| `tasks/lessons.md` | Sprint lessons log (13 entries) | 1/2 | Read at session start |
+| `rag/synthesizer.py` | GPT-4o-mini profile generation + generate_all_profiles() batch (104 neighborhoods) | 2/3 | |
+| `agent/agent.py` | LangChain 1.x agent (gpt-4o-mini) — get_agent(), ask() multi-turn interface | 3 | Switched from Groq (free tier hit in ~15 questions) |
+| `agent/tools.py` | rank_neighborhoods, get_profile, search_reviews — fuzzy name resolution | 3 | |
+| `agent/executor.py` | Thin wrapper re-exporting get_agent + ask for UI import stability | 3 | |
+| `ui/map_builder.py` | Folium choropleth builder — green→red colormap, CartoDB Positron | 3 | |
+| `ui/app.py` | 4-tab Streamlit dashboard — Map, Profiles, Compare & Temporal, Chat | 3 | |
+| `tasks/lessons.md` | Sprint lessons log | 1/2/3 | Read at session start |
 
 > NEVER update sprint status or this table without Luna's explicit confirmation (Sprint Completion Protocol above).
 
@@ -215,6 +222,14 @@ This is the record of *why* the codebase looks the way it does. Never silently r
 | Apr 19, 2026 | 2 | `rag/retriever.py` — pgvector cosine similarity via match_embeddings() RPC | Multi-query retrieval merges results across 5 noise-aspect queries, deduplicates |
 | Apr 19, 2026 | 2 | `rag/synthesizer.py` — GPT-4o-mini profile generation | Anthropic removed from stack; OpenAI consolidates embeddings + synthesis under one provider |
 | Apr 19, 2026 | 2 | Live agent switched to Groq (Llama 3.1 70B, free tier) | Per-user Claude API cost eliminated; Groq free tier covers PoC scale (14,400 req/day) |
+| Apr 21, 2026 | 3 | `migrations/003_profiles_table.sql` — profiles table + latest_profiles view | Pre-generated profiles stored at pipeline time; UI reads from DB (zero API cost per page load) |
+| Apr 21, 2026 | 3 | `db.write_profile() / load_profile() / load_all_profiles() / load_neighborhood_reviews() / load_latest_scores()` | UI read layer added to db.py alongside pipeline write functions |
+| Apr 21, 2026 | 3 | `rag/synthesizer.generate_all_profiles()` — batch generate all 104 neighborhoods | Fixed to iterate neighborhoods table (not reviews); data-sparse neighborhoods get score-only profiles; 104/104 coverage |
+| Apr 21, 2026 | 3 | `agent/agent.py` — LangChain 1.x agent (gpt-4o-mini, switched from Groq) | Groq free tier hit in 15–20 questions (agent loops re-send full context ~5–7K tokens/call); gpt-4o-mini consolidates on existing provider |
+| Apr 21, 2026 | 3 | `agent/tools.py` — rank_neighborhoods, get_profile, search_reviews | Fuzzy name resolution (`_resolve_name`) fixes "Brickell" → correct neighborhood; tools cover all query types |
+| Apr 21, 2026 | 3 | `agent/executor.py` — stable import facade for UI | UI imports one name; agent internals can change without touching app.py |
+| Apr 21, 2026 | 3 | `ui/map_builder.py` — Folium choropleth (green→red, CartoDB Positron, GeoJsonTooltip) | Separated from app.py; build_map() takes scored GeoDataFrame, returns folium.Map |
+| Apr 21, 2026 | 3 | `ui/app.py` — 4-tab Streamlit dashboard | Map (click-to-profile via point-in-polygon), Profiles (searchable/filterable/sortable), Compare & Temporal (both neighborhoods required; review keyword bucketing), Chat (agent, input pinned at top) |
 
 ---
 

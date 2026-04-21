@@ -515,10 +515,136 @@ Returns a 3–5 sentence natural-language noise profile suitable for a renter.
 
 ---
 
+## Sprint 3 — Conversational Agent + UI
+
+### `migrations/003_profiles_table.sql`
+
+Creates the `profiles` table and `latest_profiles` view.
+
+- `profiles` — `(id, neighborhood_id, profile_text, model, generated_at)`. One row per generation run per neighborhood; the view selects the most recent via `DISTINCT ON (neighborhood_id) ORDER BY generated_at DESC`.
+- `latest_profiles` view — joins with `neighborhoods` to expose `neighborhood_name` and `neighborhood_slug` alongside `profile_text`. Read by the UI for click-to-profile (zero API cost per page load).
+- RLS: public read enabled; writes require service role key.
+
+**Connects to:** `ingestion/db.py` (`write_profile`, `load_profile`, `load_all_profiles`), `ui/app.py`.
+
+---
+
+### `rag/synthesizer.py` (updated)
+
+Added `generate_all_profiles() → int` alongside `generate_profile(name)`.
+
+Iterates the `neighborhoods` table directly (all 104 rows) rather than the `reviews` table. Neighborhoods with venue reviews get full RAG-grounded profiles; data-sparse residential neighborhoods get score-only profiles derived from `composite_score` and `source_scores`. Returns count of profiles written.
+
+Called from `pipeline.run_and_persist()` after `embed_all()`.
+
+---
+
+### `ingestion/db.py` (updated)
+
+Added five UI-facing read functions:
+
+| Function | Returns | Used by |
+|---|---|---|
+| `write_profile(name, text, model)` | — | `synthesizer.generate_all_profiles()` |
+| `load_profile(name) → str \| None` | Latest profile text for one neighborhood | `ui/app.py` click-to-profile |
+| `load_all_profiles() → list[dict]` | `[{neighborhood_name, profile_text}]` for all neighborhoods | Profiles tab |
+| `load_neighborhood_reviews(name) → list[str]` | All review texts for one neighborhood | Compare & Temporal tab |
+| `load_latest_scores() → dict[str, float]` | `{name: composite_score}` from `latest_noise_scores` view | Map choropleth + metrics |
+
+---
+
+### `agent/agent.py`
+
+LangChain 1.x conversational agent backed by OpenAI `gpt-4o-mini`.
+
+**Entry points:**
+- `get_agent()` — builds and returns a `CompiledStateGraph` (LangChain 1.x `create_agent`). Called once at app startup; cached via `@st.cache_resource`.
+- `ask(agent, user_input, history) → (reply_text, updated_history)` — sends one turn. `history` is the full LangChain message list (HumanMessage, AIMessage, tool call/result intermediates); returned `updated_history` is passed back on the next call to preserve multi-turn context.
+
+**LLM choice:** Started with Groq Llama 3.3 70B (free tier). Hit the 100K-tokens/day cap in 15–20 questions — agent loops re-send full context (~5–7K tokens/question). Switched to `gpt-4o-mini`; consolidates on the existing OpenAI provider, pennies at PoC scale, far higher rate limits. See `tasks/lessons.md` L16.
+
+**System prompt enforces:**
+- `get_profile` always called first for neighborhood-specific questions
+- `search_reviews` called on the same turn for timing-qualified questions
+- `rank_neighborhoods` only for multi-neighborhood ranking queries
+- Answers cite composite score; no invented venue names or hours
+
+**Error handling:** `RateLimitError` and `GraphRecursionError` surface as user-readable messages rather than tracebacks.
+
+**Connects to:** `agent/tools.py`, `langchain_openai.ChatOpenAI`, `agent/executor.py`.
+
+---
+
+### `agent/tools.py`
+
+Three LangChain tools registered as `TOOLS`:
+
+| Tool | Input | What it does |
+|---|---|---|
+| `rank_neighborhoods` | `top_n`, `order` ("loudest"/"quietest") | Reads `latest_noise_scores` view, returns ranked list with scores and labels |
+| `get_profile` | `neighborhood_name` | Resolves name via `_resolve_name()`, loads profile from `latest_profiles` |
+| `search_reviews` | `neighborhood_name`, `query` | Runs `rag.retriever.retrieve_multi_query()`, returns top review excerpts |
+
+**`_resolve_name(name)`:** exact match → case-insensitive partial match → rank by review count. Fixes "Brickell" resolving to the wrong Brickell sub-neighborhood.
+
+**Connects to:** `ingestion/db.py`, `rag/retriever.py`.
+
+---
+
+### `agent/executor.py`
+
+Thin re-export facade:
+
+```python
+from agent.agent import ask, get_agent
+```
+
+The UI imports only from here. Agent internals (`agent.py`, `tools.py`) can change without touching `ui/app.py`.
+
+---
+
+### `ui/map_builder.py`
+
+**Entry point:** `build_map(gdf: GeoDataFrame) → folium.Map`
+
+Builds a Folium choropleth map from a GeoDataFrame with `name`, `geometry`, and `composite_score` columns.
+
+- Base tiles: CartoDB Positron (clean, no visual noise).
+- Colormap: `branca.LinearColormap` green → yellow → red, vmin=0 vmax=1.
+- `GeoJson` layer with `style_function` (fillColor from colormap) and `highlight_function` (darker border on hover).
+- `GeoJsonTooltip` shows neighborhood name and score percentage.
+- Colormap legend added to map.
+
+**Connects to:** `ui/app.py`, `folium`, `branca`.
+
+---
+
+### `ui/app.py`
+
+Four-tab Streamlit dashboard. Entry point: `streamlit run ui/app.py` from project root.
+
+**Shared data loading (cached):**
+- `_scores()` — `@st.cache_data(ttl=3600)` — `load_latest_scores()` → score dict
+- `_gdf()` — `@st.cache_data(ttl=86400)` — GeoDataFrame from GeoJSON
+- `_all_profiles()` — `@st.cache_data(ttl=3600)` — all profiles as list of dicts
+- `_profile(name)` — `@st.cache_data(ttl=300)` — single profile for click-to-profile
+- `_reviews(name)` — `@st.cache_data(ttl=3600)` — review texts for temporal analysis
+- `_agent()` — `@st.cache_resource` — LangChain agent (built once, shared across reruns)
+
+**Tab 1 — Map:** Folium choropleth via `st_folium`. Click → point-in-polygon lookup (`shapely.Point.within`) → `st.session_state.selected` → profile loaded from DB. Quicklinks to top-5 loudest neighborhoods when nothing is selected.
+
+**Tab 2 — Neighborhood Profiles:** Text search + noise-level dropdown filter + sort (loudest/quietest/A→Z). Results as `st.expander` cards showing score badge, classification, and full profile text.
+
+**Tab 3 — Compare & Temporal:** Two `st.selectbox` dropdowns; both required before any content renders. Side-by-side score metrics + profiles. Temporal section: reviews split into weekend/night vs. weekday/day buckets by keyword matching (`split_temporal()`); top 3 excerpts shown per bucket. Placeholder expander for production time-series charts.
+
+**Tab 4 — Chat with MiaNoise:** `st.form` with text input + Send button pinned at top of tab (always visible). Messages render below in reverse-chronological order. `agent_history` (LangChain message objects) stored in `st.session_state` for multi-turn context; display messages (`{role, content}` dicts) stored separately for `st.chat_message` rendering.
+
+**Connects to:** `ingestion/db.py`, `ui/map_builder.py`, `agent/executor.py`, `streamlit_folium`, `shapely`.
+
+---
+
 ## Modules Stubbed — Not Yet Implemented
 
 | Path | Sprint | Purpose |
 |---|---|---|
-| `agent/` | 3 | LangChain AgentExecutor + Groq tools |
-| `ui/app.py` | 3 | Streamlit app, Folium map, chat interface |
 | `eval/` | 4 | RAGAS evaluation framework |

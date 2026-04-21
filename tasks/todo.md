@@ -60,8 +60,14 @@
 
 - [x] **3.1** Pre-generate profiles at pipeline time — run synthesizer for all 58 neighborhoods with venues, store `profile_text` in Supabase (profiles table + latest_profiles view). **58 profiles written, 5–22 chunks each. [DONE ✓ Apr 19]**
 - [x] **3.2** Build LangChain agent (OpenAI gpt-4o-mini, swapped from Groq — see direction change below) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews`. **Agent live, 104/104 neighborhood profiles, nuanced grounded answers validated. [DONE ✓ Apr 21]**
-- [~] **3.3** Streamlit UI — 4-tab dashboard (Map, Profiles, Compare & Temporal, Chat) committed to poc; wiring chat tab to 3.2 agent in progress
+- [x] **3.3** Streamlit UI — 4-tab dashboard (Map, Profiles, Compare & Temporal, Chat with MiaNoise) live on poc. Chat tab wired to 3.2 agent; input pinned at top, messages below. **[DONE ✓ Apr 21]**
 - [ ] **3.4** End-to-end test — "find me a quiet neighborhood" returns ranked list with profiles; map click shows Wynwood profile
+
+### Direction Changes — Sprint 3.3 (Apr 21)
+
+**Floating FAB chat widget → Chat tab:**
+- Tried: CSS `:has(> #marker) ~ sibling` selectors to position Streamlit elements as `position: fixed` overlay. DOM structure made reliable targeting impossible — tab content blocks and widget containers shared the same `stVerticalBlock` type, selectors misfired.
+- Decided (with Luna): revert to dedicated "Chat with MiaNoise" tab. Input pinned at top of tab (never scrolls away); messages render below in reverse-chronological order so latest response is always closest to input.
 
 ### Direction Changes — Sprint 3.2 (confirmed Apr 21)
 
