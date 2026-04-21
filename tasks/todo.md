@@ -59,7 +59,7 @@
 ### Tasks
 
 - [x] **3.1** Pre-generate profiles at pipeline time — run synthesizer for all 58 neighborhoods with venues, store `profile_text` in Supabase (profiles table + latest_profiles view). **58 profiles written, 5–22 chunks each. [DONE ✓ Apr 19]**
-- [x] **3.2** Build LangChain agent (OpenAI gpt-4o-mini, swapped from Groq — see direction change below) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews` **[DONE ✓ Apr 21]**
+- [x] **3.2** Build LangChain agent (OpenAI gpt-4o-mini, swapped from Groq — see direction change below) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews`. **Agent live, 104/104 neighborhood profiles, nuanced grounded answers validated. [DONE ✓ Apr 21]**
 - [~] **3.3** Streamlit UI — 4-tab dashboard (Map, Profiles, Compare & Temporal, Chat) committed to poc; wiring chat tab to 3.2 agent in progress
 - [ ] **3.4** End-to-end test — "find me a quiet neighborhood" returns ranked list with profiles; map click shows Wynwood profile
 
