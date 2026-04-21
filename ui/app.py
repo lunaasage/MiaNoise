@@ -371,9 +371,11 @@ with tab_chat:
         '"Compare Wynwood and Edgewater"'
     )
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    msg_container = st.container(height=520)
+    with msg_container:
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
     if prompt := st.chat_input("Ask a question about Miami noise…"):
         st.session_state.messages.append({"role": "user", "content": prompt})
