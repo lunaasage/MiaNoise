@@ -95,3 +95,12 @@ Read this at the start of every session. Update after every correction or unexpe
 **What happened:** Groq free tier caps at 100K tokens/day. LangGraph agent loops re-send full conversation context on every internal LLM call — a single user question consumes ~5–7K tokens across multiple hops. 15–20 user questions blow the daily cap. Switching to Groq dev tier was not available at the time.
 **Lesson:** Free-tier LLMs work for one-off inference (profile synthesis, a few test calls) but fail immediately for agentic loops, which multiply token consumption by ~5x vs naive estimates. Always estimate token usage accounting for agent loop overhead before committing to a provider.
 **Rule:** For any agent loop, assume 5–10× token multiplier vs. single-turn. Size the provider tier accordingly before building. Default to the provider already in the stack (OpenAI was already used for embeddings + synthesis) rather than adding a new one for cost reasons that evaporate at PoC scale.
+
+---
+
+## Sprint 3.4
+
+### L17 — Raw venue count is a poor noise signal; venue type weighting is mandatory
+**What happened:** `osm_venues` counted bars, nightclubs, and restaurants equally (1 point each), then max-normalized against all 104 neighborhoods. Wynwood scored 0.3 despite being Miami's loudest nightlife district — it has fewer total venues than dense commercial areas like Downtown, but its mix is specifically nightclubs and bars with outdoor patios open until 3–4am. The score measured structural density, not noise behavior.
+**Lesson:** Any venue-count signal needs type weighting before max-normalization. A nightclub generates fundamentally different noise than a restaurant — late hours, amplified music, outdoor crowds. Without weighting, a neighborhood full of cafés outscores a nightlife district.
+**Rule:** When adding any venue or amenity count signal, define a noise-impact weight per type before aggregating. Score = sum(type_weight) / max, not raw count / max. Regenerate profiles after any score change — profile text bakes in the composite score value.

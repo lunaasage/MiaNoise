@@ -230,6 +230,7 @@ This is the record of *why* the codebase looks the way it does. Never silently r
 | Apr 21, 2026 | 3 | `agent/executor.py` — stable import facade for UI | UI imports one name; agent internals can change without touching app.py |
 | Apr 21, 2026 | 3 | `ui/map_builder.py` — Folium choropleth (green→red, CartoDB Positron, GeoJsonTooltip) | Separated from app.py; build_map() takes scored GeoDataFrame, returns folium.Map |
 | Apr 21, 2026 | 3 | `ui/app.py` — 4-tab Streamlit dashboard | Map (click-to-profile via point-in-polygon), Profiles (searchable/filterable/sortable), Compare & Temporal (both neighborhoods required; review keyword bucketing), Chat (agent, input pinned at top) |
+| Apr 21, 2026 | 3.4 | `osm_venues.py` — venue type weighting (nightclub×3, bar×2, restaurant×0.5) | Score was raw venue count — a McDonald's equalled a nightclub. Wynwood scored 0.3 despite being one of Miami's loudest neighborhoods because it has fewer total venues than dense commercial districts. Weighted sum + max-normalize gives nightlife-heavy neighborhoods their correct relative standing. Cache bumped to v2 to force re-fetch with amenity tags. Profiles regenerated against new scores. |
 
 ---
 

@@ -20,11 +20,20 @@ OVERPASS_HEADERS = {"User-Agent": "MiaNoise/1.0 (noise intelligence research)"}
 
 # Venue data cached locally to survive Overpass downtime. Shorter TTL than roads
 # (1 day) since venues open and close; road network is stable for weeks.
-CACHE_PATH = Path("data/cache/osm_venues_miami.gpkg")
+# v2: cache path bumped to force re-fetch after adding amenity tag to schema.
+CACHE_PATH = Path("data/cache/osm_venues_v2_miami.gpkg")
 CACHE_TTL_DAYS = 1
 
 # Venue types that drive nighttime noise
 VENUE_AMENITIES = ["bar", "nightclub", "restaurant"]
+
+# Noise weight per venue type. Nightclubs are 6× louder by impact than
+# restaurants — loud music, late hours, outdoor crowds vs. ambient dining noise.
+VENUE_WEIGHTS: dict[str, float] = {
+    "nightclub":  3.0,
+    "bar":        2.0,
+    "restaurant": 0.5,
+}
 
 
 class OSMVenueDensity(NoiseSource):
@@ -37,7 +46,7 @@ class OSMVenueDensity(NoiseSource):
     - Returns every mapped venue in Miami — typically 3–5× more complete
     - Bounding box is computed from the neighborhood GeoJSON at fetch time
 
-    Venue points are cached locally (data/cache/osm_venues_miami.gpkg, 1-day TTL)
+    Venue points are cached locally (data/cache/osm_venues_v2_miami.gpkg, 1-day TTL)
     so the pipeline is not blocked by Overpass availability on every run.
     """
 
@@ -56,32 +65,39 @@ class OSMVenueDensity(NoiseSource):
             return self._zero_scores(neighborhoods)
 
         joined = gpd.sjoin(
-            venues_gdf[["geometry"]],
+            venues_gdf[["geometry", "amenity"]],
             neighborhoods,
             how="left",
             predicate="within",
+        )
+        joined["noise_weight"] = joined["amenity"].map(VENUE_WEIGHTS).fillna(0.5)
+
+        raw = (
+            joined.groupby("name")["noise_weight"]
+            .sum()
+            .reindex(neighborhoods["name"], fill_value=0.0)
         )
         counts = (
             joined.groupby("name").size().reindex(neighborhoods["name"], fill_value=0)
         )
 
-        max_count = counts.max()
-        if max_count == 0:
+        max_val = raw.max()
+        if max_val == 0:
             return self._zero_scores(neighborhoods)
 
         logger.info(
-            "osm_venues: %d venues across %d neighborhoods (max=%d)",
-            int(counts.sum()), int((counts > 0).sum()), int(max_count),
+            "osm_venues: %d venues across %d neighborhoods (max weighted=%.1f)",
+            int(counts.sum()), int((counts > 0).sum()), max_val,
         )
         return [
             NeighborhoodScore(
                 neighborhood=name,
-                normalized_score=round(count / max_count, 6),
-                raw_value=float(count),
+                normalized_score=round(raw[name] / max_val, 6),
+                raw_value=round(raw[name], 2),
                 source_id=self.source_id,
-                metadata={"venue_count": int(count)},
+                metadata={"venue_count": int(counts[name]), "weighted_score": round(raw[name], 2)},
             )
-            for name, count in counts.items()
+            for name in neighborhoods["name"]
         ]
 
     def _fetch_venues(self, bbox: str) -> gpd.GeoDataFrame:
@@ -109,6 +125,7 @@ class OSMVenueDensity(NoiseSource):
                     ),
                     crs="EPSG:4326",
                 )
+                gdf = gdf[["geometry", "amenity"]]
                 CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
                 gdf.to_file(CACHE_PATH, driver="GPKG")
                 logger.info("osm_venues: cached %d venues to %s", len(gdf), CACHE_PATH)
@@ -148,13 +165,14 @@ out center;
 
     @staticmethod
     def _to_points(elements: list[dict]) -> list[dict]:
-        """Extract (lat, lon) from nodes and ways (ways carry center coords)."""
+        """Extract (lat, lon, amenity) from nodes and ways (ways carry center coords)."""
         points = []
         for el in elements:
+            amenity = el.get("tags", {}).get("amenity", "restaurant")
             if el["type"] == "node":
-                points.append({"lat": el["lat"], "lon": el["lon"]})
+                points.append({"lat": el["lat"], "lon": el["lon"], "amenity": amenity})
             elif el["type"] == "way" and "center" in el:
-                points.append({"lat": el["center"]["lat"], "lon": el["center"]["lon"]})
+                points.append({"lat": el["center"]["lat"], "lon": el["center"]["lon"], "amenity": amenity})
         return points
 
     @staticmethod

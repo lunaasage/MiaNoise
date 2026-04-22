@@ -67,6 +67,19 @@
   - Iterate on system prompt (`agent/agent.py`) and tool descriptions (`agent/tools.py`) until answers are consistently correct and well-reasoned
   - Document what changed and why in `tasks/todo.md` direction changes
 
+### Direction Change — Score Recalibration before 3.4 testing (confirmed Apr 21)
+
+**Problem:** Wynwood scores ~0.3 despite being one of Miami's loudest neighborhoods. Root cause: `osm_venues` counts all venues equally (nightclub = McDonald's = 1 point); raw count is max-normalized against Miami's densest commercial districts, so Wynwood's 20-30 venues compress to 0.3 on that axis. Reviews are corpus-only and contribute 0.0 to the score. Road signal (osm_roads) is weak for Wynwood (no motorways). Result: the score measures structural venue density, not noise behavior.
+
+**Decided (with Luna):** Fix venue type weighting in `osm_venues.py` before running end-to-end tests, so testing reflects meaningful scores. Score = sum(venue_type_weight) per neighborhood instead of raw count, then max-normalize. Then re-run pipeline to update Supabase. Then proceed with 3.4 testing and prompt tuning.
+
+**Venue type weights:**
+- nightclub: 3.0 (loud music, late hours, outdoor crowds)
+- bar: 2.0 (social noise, late hours)
+- restaurant: 0.5 (ambient, earlier closing)
+
+**Why deferred 311 as scoring signal:** 578 records is thin; venue type weighting is higher-value first. Can revisit in Sprint 4.
+
 ### Direction Changes — Sprint 3.3 (Apr 21)
 
 **Floating FAB chat widget → Chat tab:**
