@@ -122,7 +122,11 @@ def write_corpus(documents: list) -> int:
     result = client.table("neighborhoods").select("id,name").execute()
     name_to_id = {r["name"]: r["id"] for r in result.data}
 
+    existing = client.table("reviews").select("neighborhood_id,content").execute()
+    existing_pairs = {(r["neighborhood_id"], r["content"]) for r in existing.data}
+
     rows = []
+    skipped_dup = 0
     for doc in documents:
         if not isinstance(doc, CorpusDocument):
             continue
@@ -131,6 +135,9 @@ def write_corpus(documents: list) -> int:
             logger.warning(
                 "write_corpus: no DB record for neighborhood %r — skipping", doc.neighborhood
             )
+            continue
+        if (nbhd_id, doc.content) in existing_pairs:
+            skipped_dup += 1
             continue
         rows.append({
             "neighborhood_id": nbhd_id,
@@ -143,7 +150,10 @@ def write_corpus(documents: list) -> int:
 
     if rows:
         client.table("reviews").insert(rows).execute()
-    logger.info("write_corpus: wrote %d review rows (%d skipped)", len(rows), len(documents) - len(rows))
+    logger.info(
+        "write_corpus: wrote %d review rows (%d skipped — no neighborhood, %d skipped — duplicates)",
+        len(rows), len(documents) - len(rows) - skipped_dup, skipped_dup,
+    )
     return len(rows)
 
 
