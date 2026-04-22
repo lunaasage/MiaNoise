@@ -72,33 +72,33 @@ class OSMVenueDensity(NoiseSource):
         )
         joined["noise_weight"] = joined["amenity"].map(VENUE_WEIGHTS).fillna(0.5)
 
-        raw = (
-            joined.groupby("name")["noise_weight"]
-            .sum()
-            .reindex(neighborhoods["name"], fill_value=0.0)
-        )
-        counts = (
-            joined.groupby("name").size().reindex(neighborhoods["name"], fill_value=0)
-        )
+        raw_grouped = joined.groupby("name")["noise_weight"].sum()
+        counts_grouped = joined.groupby("name").size()
 
-        max_val = raw.max()
+        max_val = raw_grouped.max()
         if max_val == 0:
             return self._zero_scores(neighborhoods)
 
         logger.info(
             "osm_venues: %d venues across %d neighborhoods (max weighted=%.1f)",
-            int(counts.sum()), int((counts > 0).sum()), max_val,
+            int(counts_grouped.sum()), len(counts_grouped), max_val,
         )
-        return [
-            NeighborhoodScore(
+        seen: set[str] = set()
+        results = []
+        for name in neighborhoods["name"]:
+            if name in seen:
+                continue
+            seen.add(name)
+            raw_val = raw_grouped.get(name, 0.0)
+            count_val = counts_grouped.get(name, 0)
+            results.append(NeighborhoodScore(
                 neighborhood=name,
-                normalized_score=round(raw[name] / max_val, 6),
-                raw_value=round(raw[name], 2),
+                normalized_score=round(raw_val / max_val, 6),
+                raw_value=round(raw_val, 2),
                 source_id=self.source_id,
-                metadata={"venue_count": int(counts[name]), "weighted_score": round(raw[name], 2)},
-            )
-            for name in neighborhoods["name"]
-        ]
+                metadata={"venue_count": int(count_val), "weighted_score": round(raw_val, 2)},
+            ))
+        return results
 
     def _fetch_venues(self, bbox: str) -> gpd.GeoDataFrame:
         """
