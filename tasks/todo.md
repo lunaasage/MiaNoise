@@ -61,11 +61,17 @@
 - [x] **3.1** Pre-generate profiles at pipeline time — run synthesizer for all 58 neighborhoods with venues, store `profile_text` in Supabase (profiles table + latest_profiles view). **58 profiles written, 5–22 chunks each. [DONE ✓ Apr 19]**
 - [x] **3.2** Build LangChain agent (OpenAI gpt-4o-mini, swapped from Groq — see direction change below) and three tools: `rank_neighborhoods`, `get_profile`, `search_reviews`. **Agent live, 104/104 neighborhood profiles, nuanced grounded answers validated. [DONE ✓ Apr 21]**
 - [x] **3.3** Streamlit UI — 4-tab dashboard (Map, Profiles, Compare & Temporal, Chat with MiaNoise) live on poc. Chat tab wired to 3.2 agent; input pinned at top, messages below. **[DONE ✓ Apr 21]**
-- [ ] **3.4** End-to-end validation + prompt tuning
-  - Run test queries through the live UI: "find me a quiet neighborhood", "is Wynwood loud on weekdays?", map click on Wynwood
-  - Evaluate answer quality: grounded in data? cites score? concise? no hallucinated venues?
-  - Iterate on system prompt (`agent/agent.py`) and tool descriptions (`agent/tools.py`) until answers are consistently correct and well-reasoned
-  - Document what changed and why in `tasks/todo.md` direction changes
+- [x] **3.4** End-to-end validation + prompt tuning **[DONE ✓ Apr 24]**
+  - osm_venues venue type weighting (nightclub×3, bar×2, restaurant×0.5) — Wynwood now #3 at 0.52
+  - osm_venues non-unique index crash fixed (`.reindex()` → `.get()` on groupby)
+  - write_corpus() dedup fix — prevents duplicate reviews on repeated pipeline runs
+  - Pipeline re-run: 104 scores, 4454 new reviews, 4454 embeddings, 104 profiles regenerated
+  - Map colormap vmax fixed — stretches to actual max score (0.70), not hardcoded 1.0
+  - Chat display fixed — user message renders immediately on submit, spinner below
+  - psycopg2-binary removed (unused); Python 3.11 pinned for Streamlit Cloud deploy
+  - End-to-end UI validated: map correct, agent grounded, chat flow working
+
+⚠️ **Sprint 4 data issue flagged:** Agent lists 10+ neighborhoods all scored 0.00 when asked for quiet places. These neighborhoods (Fair Isle, Belle Island, etc.) have no mapped OSM venues and minimal road signal — score of 0.00 is technically correct but creates poor UX. Options: (a) floor scores at a small epsilon so agent can still rank them, (b) agent system prompt instructs it to say "limited data" instead of citing a score of 0%, (c) supplement with additional data sources. Carry into Sprint 4 polish.
 
 ### Direction Change — Score Recalibration before 3.4 testing (confirmed Apr 21)
 

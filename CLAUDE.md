@@ -126,8 +126,9 @@ explains *why* a neighborhood has that score using retrieved review text.
 - **Sprint 1**: DONE ✓ (confirmed Apr 19) — pipeline runs end-to-end, 104 neighborhoods scored, data in Supabase, Overpass caching in place
 - **Sprint 2**: DONE ✓ (confirmed Apr 19) — 10,095 reviews collected, embedded, retrieval working, GPT-4o-mini profiles verified end-to-end
 - **Sprint 3**: DONE ✓ (confirmed Apr 21) — 4-tab Streamlit dashboard live: Map (Folium choropleth + click-to-profile), Neighborhood Profiles (searchable/filterable), Compare & Temporal (side-by-side + review keyword analysis), Chat with MiaNoise (LangChain agent, input pinned at top)
+- **Sprint 3.4**: DONE ✓ (confirmed Apr 24) — venue type weighting, crash fix, dedup, pipeline re-run, colormap fix, chat display fix, Streamlit Cloud deploy unblocked
 - **Sprint 4**: [CURRENT] — Evaluation + polish
-- **Next**: RAGAS evaluation report, shareable URL
+- **Next**: RAGAS evaluation report, shareable URL. ⚠️ Carry-in: agent lists 10+ neighborhoods at 0.00 score — UX issue flagged for Sprint 4 polish.
 
 ### Key Files
 | File | Role | Sprint | Notes |
@@ -140,7 +141,7 @@ explains *why* a neighborhood has that score using retrieved review text.
 | `data/geojson/miami_neighborhoods.geojson` | 104 neighborhood polygons (WGS84) | 0 | Used by all spatial joins |
 | `ingestion/db.py` | Supabase I/O — seed, write_scores, write_corpus, write_profile, load_profile, load_all_profiles, load_neighborhood_reviews, load_latest_scores, load GDF/centroids | 1/2/3 | |
 | `ingestion/pipeline.py` | Orchestrator — scoring/corpus split, embed_all, generate_all_profiles, run_and_persist() | 1/2/3 | |
-| `ingestion/sources/osm_venues.py` | OSM venue density — scoring (w=0.6), 1-day cache | 1 | |
+| `ingestion/sources/osm_venues.py` | OSM venue density — scoring (w=0.6), type-weighted (nightclub×3, bar×2, restaurant×0.5), 1-day cache | 1/3.4 | Crash fix: groupby .get() replaces .reindex() |
 | `ingestion/sources/osm_roads.py` | OSM weighted road-km — scoring (w=0.4), 7-day cache | 1 | |
 | `ingestion/sources/google_places_reviews.py` | Google Places review text — primary corpus source | 2 | 10,095 reviews across 58 neighborhoods |
 | `rag/embedder.py` | Batch embed reviews with text-embedding-3-small, idempotent | 2 | |
@@ -149,8 +150,8 @@ explains *why* a neighborhood has that score using retrieved review text.
 | `agent/agent.py` | LangChain 1.x agent (gpt-4o-mini) — get_agent(), ask() multi-turn interface | 3 | Switched from Groq (free tier hit in ~15 questions) |
 | `agent/tools.py` | rank_neighborhoods, get_profile, search_reviews — fuzzy name resolution | 3 | |
 | `agent/executor.py` | Thin wrapper re-exporting get_agent + ask for UI import stability | 3 | |
-| `ui/map_builder.py` | Folium choropleth builder — green→red colormap, CartoDB Positron | 3 | |
-| `ui/app.py` | 4-tab Streamlit dashboard — Map, Profiles, Compare & Temporal, Chat | 3 | |
+| `ui/map_builder.py` | Folium choropleth builder — green→red colormap, vmax=actual max score | 3/3.4 | |
+| `ui/app.py` | 4-tab Streamlit dashboard — Map, Profiles, Compare & Temporal, Chat | 3/3.4 | Chat display: user message renders before spinner |
 | `tasks/lessons.md` | Sprint lessons log | 1/2/3 | Read at session start |
 
 > NEVER update sprint status or this table without Luna's explicit confirmation (Sprint Completion Protocol above).
@@ -231,6 +232,11 @@ This is the record of *why* the codebase looks the way it does. Never silently r
 | Apr 21, 2026 | 3 | `ui/map_builder.py` — Folium choropleth (green→red, CartoDB Positron, GeoJsonTooltip) | Separated from app.py; build_map() takes scored GeoDataFrame, returns folium.Map |
 | Apr 21, 2026 | 3 | `ui/app.py` — 4-tab Streamlit dashboard | Map (click-to-profile via point-in-polygon), Profiles (searchable/filterable/sortable), Compare & Temporal (both neighborhoods required; review keyword bucketing), Chat (agent, input pinned at top) |
 | Apr 21, 2026 | 3.4 | `osm_venues.py` — venue type weighting (nightclub×3, bar×2, restaurant×0.5) | Score was raw venue count — a McDonald's equalled a nightclub. Wynwood scored 0.3 despite being one of Miami's loudest neighborhoods because it has fewer total venues than dense commercial districts. Weighted sum + max-normalize gives nightlife-heavy neighborhoods their correct relative standing. Cache bumped to v2 to force re-fetch with amenity tags. Profiles regenerated against new scores. |
+| Apr 24, 2026 | 3.4 | `osm_venues.py` — non-unique index crash fix | `.reindex(neighborhoods["name"])` produced duplicate index for Baypoint/Fair Isle; `counts[name]` returned Series instead of scalar → TypeError. Fixed: use groupby result (unique index) with `.get()` and deduplicate output loop with seen set. |
+| Apr 24, 2026 | 3.4 | `ingestion/db.py` — `write_corpus()` dedup | No deduplication existed; repeated pipeline runs inserted duplicate reviews. Fixed: fetch existing (neighborhood_id, content) pairs before insert, skip any already present. |
+| Apr 24, 2026 | 3.4 | `ui/map_builder.py` — colormap vmax fix | Hardcoded vmax=1.0 compressed all scores into green-yellow range since max is 0.70. Fixed: vmax=actual max score in data, green→red now spans real distribution. |
+| Apr 24, 2026 | 3.4 | `ui/app.py` — chat message display fix | User message and agent response appeared simultaneously after generation. Fixed: append user message + rerun immediately on submit; render history first, then spinner below; generate response; rerun. |
+| Apr 24, 2026 | 3.4 | `requirements.txt` + `.python-version` — Streamlit Cloud deploy fix | psycopg2-binary not imported anywhere; removed. Python 3.14 has no pre-built wheel for it. Pinned Python 3.11 via `.python-version`. |
 
 ---
 
