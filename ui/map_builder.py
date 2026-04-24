@@ -20,10 +20,11 @@ def build_map(gdf: gpd.GeoDataFrame) -> folium.Map:
     Returns:
         folium.Map ready for st_folium.
     """
+    max_score = float(gdf["composite_score"].max()) or 1.0
     colormap = cm.LinearColormap(
         colors=["#2ecc71", "#f1c40f", "#e74c3c"],
         vmin=0.0,
-        vmax=1.0,
+        vmax=max_score,
         caption="Noise Score  (0 = quiet · 1 = loud)",
     )
 

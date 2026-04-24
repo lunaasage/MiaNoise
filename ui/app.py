@@ -73,6 +73,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = []       # display messages [{role, content}]
 if "agent_history" not in st.session_state:
     st.session_state.agent_history = []  # LangChain message objects for multi-turn context
+if "pending_prompt" not in st.session_state:
+    st.session_state.pending_prompt = None  # user message waiting for agent response
 
 
 # ── Shared data ────────────────────────────────────────────────────────────────
@@ -386,20 +388,28 @@ with tab_chat:
     if submitted and user_input.strip():
         prompt = user_input.strip()
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.spinner("Thinking…"):
-            agent = _agent()
-            response, updated_history = ask(
-                agent, prompt, st.session_state.agent_history
-            )
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        st.session_state.agent_history = updated_history
-        st.rerun()
+        st.session_state.pending_prompt = prompt
+        st.rerun()  # rerun immediately so user message renders before generation starts
 
     # Messages below the input box
     st.divider()
-    if not st.session_state.messages:
+    if not st.session_state.messages and not st.session_state.pending_prompt:
         st.caption("Your conversation will appear here.")
     else:
+        # If a response is pending, generate it now (user message already visible above)
+        if st.session_state.pending_prompt:
+            pending = st.session_state.pending_prompt
+            st.session_state.pending_prompt = None
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking…"):
+                    agent = _agent()
+                    response, updated_history = ask(
+                        agent, pending, st.session_state.agent_history
+                    )
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.session_state.agent_history = updated_history
+            st.rerun()
+
         for msg in reversed(st.session_state.messages):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
