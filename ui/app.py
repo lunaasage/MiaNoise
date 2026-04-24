@@ -396,7 +396,12 @@ with tab_chat:
     if not st.session_state.messages and not st.session_state.pending_prompt:
         st.caption("Your conversation will appear here.")
     else:
-        # If a response is pending, generate it now (user message already visible above)
+        # Render history first (reversed = newest at top) so user message is always visible
+        for msg in reversed(st.session_state.messages):
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # Then generate response below the user message
         if st.session_state.pending_prompt:
             pending = st.session_state.pending_prompt
             st.session_state.pending_prompt = None
@@ -409,7 +414,3 @@ with tab_chat:
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.session_state.agent_history = updated_history
             st.rerun()
-
-        for msg in reversed(st.session_state.messages):
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
