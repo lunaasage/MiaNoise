@@ -116,10 +116,17 @@ def rank_neighborhoods(order: str = "noisiest") -> str:
         name = row["neighborhood_name"]
         score = row["composite_score"]
         pct = _percentile_label(score, all_scores)
-        lines.append(f"{i:2}. {name} — score {score:.2f} ({pct})")
+        data_note = " [limited data]" if score == 0.0 else ""
+        lines.append(f"{i:2}. {name} — score {score:.2f} ({pct}){data_note}")
 
     header = f"{'Quietest' if order.lower() == 'quietest' else 'Noisiest'} {len(rows)} Miami neighborhoods:"
-    return header + "\n" + "\n".join(lines)
+    footer = (
+        "\n\nNote: [limited data] means no mapped nightlife venues or road signal was "
+        "found for that neighborhood. Absence of noise sources is itself a positive signal "
+        "— these areas likely have fewer bars, clubs, and complaints on record — but treat "
+        "the score as a lower bound, not a verified measurement."
+    )
+    return header + "\n" + "\n".join(lines) + footer
 
 
 @tool
