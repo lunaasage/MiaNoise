@@ -31,7 +31,7 @@ streamlit-folium==0.20.0
 pydeck==0.9.1
 
 # Evaluation
-ragas==0.1.14
+ragas>=0.2,<0.3
 
 # Dev
 pytest==8.2.2

@@ -96,13 +96,13 @@ TEST_CASES: list[dict] = [
         ),
     },
     {
-        "neighborhood": "Little Havana",
-        "question": "What is the noise situation in Little Havana?",
+        "neighborhood": "East Little Havana",
+        "question": "What is the noise situation in East Little Havana?",
         "ground_truth": (
-            "Little Havana has moderate noise levels driven by street activity, restaurants, "
-            "and cultural venues. It is a vibrant neighborhood but does not have the heavy "
-            "nightclub concentration found in areas like Wynwood or Brickell Village. "
-            "Daytime street noise and music from cafés and restaurants are common."
+            "East Little Havana has moderate noise levels driven by street activity, "
+            "restaurants, and cultural venues. It is a vibrant neighborhood but does not "
+            "have the heavy nightclub concentration found in areas like Wynwood or Brickell "
+            "Village. Daytime street noise and music from cafés and restaurants are common."
         ),
     },
     {
@@ -128,13 +128,13 @@ TEST_CASES: list[dict] = [
         ),
     },
     {
-        "neighborhood": "Coconut Grove",
-        "question": "Would Coconut Grove be a good choice for a noise-sensitive renter?",
+        "neighborhood": "Grove Center",
+        "question": "Would Grove Center (Coconut Grove) be a good choice for a noise-sensitive renter?",
         "ground_truth": (
-            "Coconut Grove has a more residential and tree-lined character than Miami's "
-            "downtown neighborhoods. While the village center has restaurants and bars, "
-            "the surrounding residential areas are quieter. It is generally a better choice "
-            "for noise-sensitive renters than high-score areas like the CBD or Wynwood."
+            "Grove Center is the commercial heart of Coconut Grove and has restaurants and "
+            "bars that generate some evening noise. While more active than purely residential "
+            "areas, it is generally quieter than nightlife-heavy districts like Wynwood or "
+            "Brickell Village, with fewer late-night nightclubs."
         ),
     },
     # ── Renter decision / comparison questions ──────────────────────────────
@@ -149,13 +149,13 @@ TEST_CASES: list[dict] = [
         ),
     },
     {
-        "neighborhood": "Allapattah",
-        "question": "Is Allapattah a noisy neighborhood?",
+        "neighborhood": "Allapattah Industrial District",
+        "question": "Is Allapattah noisy?",
         "ground_truth": (
-            "Allapattah has moderate noise levels compared to Miami's nightlife districts. "
-            "It is an emerging neighborhood with commercial activity and road traffic as "
-            "the primary noise sources. It has fewer dedicated nightlife venues than areas "
-            "like Wynwood or Brickell Village."
+            "Allapattah Industrial District has moderate noise levels driven by commercial "
+            "and industrial activity rather than nightlife. Road traffic and daytime "
+            "commercial noise are the primary sources. It has fewer dedicated nightlife "
+            "venues than areas like Wynwood or Brickell Village."
         ),
     },
     {

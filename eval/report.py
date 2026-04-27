@@ -53,18 +53,12 @@ def run_ragas(eval_data: dict) -> dict:
     Returns:
         dict with 'aggregate' scores and 'per_question' list
     """
-    from datasets import Dataset
-    from ragas import evaluate
-    from ragas.metrics import (
-        faithfulness,
-        answer_relevancy,
-        context_precision,
-        context_recall,
-    )
+    from ragas import evaluate, EvaluationDataset, SingleTurnSample
+    from ragas.metrics import Faithfulness, AnswerRelevancy, ContextPrecision, ContextRecall
 
     metadata = eval_data.pop("metadata")  # not part of RAGAS schema
 
-    # Filter out zero-chunk cases — synthetic placeholders skew faithfulness/precision.
+    # Filter out zero-chunk cases — empty contexts skew faithfulness/precision metrics.
     # These are reported separately in the output as "no retrieval data".
     valid_indices = [i for i, m in enumerate(metadata) if m["has_data"]]
     skipped = [metadata[i] for i in range(len(metadata)) if not metadata[i]["has_data"]]
@@ -76,18 +70,23 @@ def run_ragas(eval_data: dict) -> dict:
     if not valid_indices:
         raise RuntimeError("All test cases returned 0 chunks — check that embed_all() has been run.")
 
-    dataset = Dataset.from_dict({
-        "question": [eval_data["question"][i] for i in valid_indices],
-        "answer": [eval_data["answer"][i] for i in valid_indices],
-        "contexts": [eval_data["contexts"][i] for i in valid_indices],
-        "ground_truth": [eval_data["ground_truth"][i] for i in valid_indices],
-    })
+    samples = [
+        SingleTurnSample(
+            user_input=eval_data["question"][i],
+            response=eval_data["answer"][i],
+            retrieved_contexts=eval_data["contexts"][i],
+            reference=eval_data["ground_truth"][i],
+        )
+        for i in valid_indices
+    ]
+    dataset = EvaluationDataset(samples=samples)
 
     n_valid = len(valid_indices)
     print(f"\nRunning RAGAS evaluation (4 metrics × {n_valid} questions)…")
     result = evaluate(
         dataset,
-        metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
+        metrics=[Faithfulness(), AnswerRelevancy(), ContextPrecision(), ContextRecall()],
+        raise_exceptions=False,
     )
 
     # Extract per-question scores (valid cases only)
@@ -181,7 +180,7 @@ def save_report(results: dict) -> None:
         "## Methodology\n",
         "- **Retrieval:** multi-query pgvector cosine similarity (text-embedding-3-small, 5 queries × top-4 chunks, deduplicated)",
         "- **Generation:** GPT-4o-mini with strict context-only instruction (no external knowledge)",
-        "- **Evaluation:** RAGAS v0.1.14 LLM-based metrics (GPT-4o-mini as judge)",
+        "- **Evaluation:** RAGAS v0.2 LLM-based metrics (GPT-4o-mini as judge)",
         "- **Test set:** 15 hand-crafted questions covering loud/quiet/temporal/renter-decision query types",
         "\n---\n",
         "_MiaNoise — Miami neighborhood noise intelligence for renters_",
