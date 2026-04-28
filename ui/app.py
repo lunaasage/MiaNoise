@@ -115,8 +115,7 @@ def noise_badge(score: float) -> str:
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
-st.title("MiaNoise")
-st.caption("Miami neighborhood noise intelligence for renters.")
+st.image(Path(__file__).parent / "logo.png", width=320)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 
