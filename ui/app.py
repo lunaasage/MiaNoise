@@ -115,7 +115,7 @@ def noise_badge(score: float) -> str:
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
-st.image(Path(__file__).parent / "logo.png", width=320)
+st.image(str(Path(__file__).parent / "logo.png"), width=320)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 
