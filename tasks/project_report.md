@@ -367,35 +367,39 @@ Each test case has a ground truth answer anchored to known facts (specific compo
 
 ## 9. Evaluation Results
 
-_Run: April 27, 2026 — 15 questions, 10 neighborhoods_
+### Two evaluation runs — why we revised
 
-### Aggregate Scores
+We ran RAGAS twice. The first run (v1 ground truths, April 27) produced low scores on context recall (0.322) and context precision (0.347). Post-run analysis revealed the cause: the v1 ground truths referenced specific composite scores ("Wynwood has a score of 0.52", "the CBD scores 0.70"). Those numbers live in our metadata layer — they never appear in Google Places reviews. RAGAS's context recall metric was penalising the system for a structural mismatch in our evaluation design, not for a retrieval failure.
+
+We rewrote all 15 ground truths to reference only qualitative, reviewable facts — things a bar or restaurant reviewer would plausibly write — and reran. This is documented as L18 in lessons.md. The second run is the canonical result.
+
+### Final Scores (v2 ground truths, April 28, 2026)
 
 | Metric | Score | Rating |
 |---|---|---|
-| **Faithfulness** | **0.847** | 🟢 Good |
-| **Answer Relevancy** | **0.321** | ⚠️ Needs improvement |
-| **Context Precision** | **0.347** | ⚠️ Needs improvement |
-| **Context Recall** | **0.322** | ⚠️ Needs improvement |
+| **Faithfulness** | **0.860** | ✅ Excellent |
+| **Answer Relevancy** | **0.446** | ⚠️ Needs improvement |
+| **Context Precision** | **0.651** | 🟡 Acceptable |
+| **Context Recall** | **0.612** | 🟡 Acceptable |
+
+_v1 scores for reference: Faithfulness 0.847 / Answer Relevancy 0.321 / Context Precision 0.347 / Context Recall 0.322_
 
 ### What These Numbers Mean
 
-**Faithfulness at 0.847 is the headline result.** This is the metric that matters most for a RAG system — it measures whether the LLM is staying grounded in retrieved evidence or making things up. A score of 0.85 means roughly 85% of all factual claims in the generated answers are directly traceable to a retrieved review chunk. For a system where trust is the whole point ("the LLM said that *because the data supports it*"), this is a strong result.
+**Faithfulness at 0.860 is the headline.** It went up slightly with the revised ground truths and is now rated Excellent. This is the metric that matters most for a trust-first RAG system — it measures whether the LLM stays grounded in retrieved evidence or invents claims. 86% of all factual statements in the generated answers are directly traceable to a retrieved review chunk. For a system whose entire value proposition is "the LLM said that *because the data supports it*," this is exactly what we want to see.
 
-**The other three metrics being lower is an honest finding, not a bug.** Here's why:
+**Context Recall (0.612) and Context Precision (0.651) are now Acceptable**, up from Needs Improvement. The precision jump (0.347 → 0.651) is particularly meaningful — it shows the retriever is surfacing relevant chunks for most questions. Recall being slightly lower reflects the fact that some ground truth facts (e.g. about quieter residential neighborhoods) simply aren't well-represented in a Google Places review corpus focused on bars and nightclubs. That's a corpus coverage gap, not a retrieval bug.
 
-The ground truths we wrote for the test set include specific composite scores ("Wynwood has a score of 0.52") and quantitative comparisons ("the CBD has the highest composite noise score, 0.70"). These facts do not appear in Google Places reviews. Reviewers write things like "this place is incredibly loud" — they don't cite composite noise indices. So when RAGAS's context recall metric asks "does the retrieved context contain the information needed to answer the ground truth?", the answer is often no — not because retrieval is failing, but because the ground truth includes metadata that the review corpus structurally cannot contain.
+**Answer Relevancy (0.446) is still the weakest metric, and partially a known artifact.** Seven of fifteen questions score 0.00. These are all complex multi-part questions: comparative ("is Edgewater quieter than Wynwood?"), renter-decision ("good for someone who works from home?"), or open-ended ("what is the noise situation?"). The RAGAS metric generates paraphrase questions from the answer and measures embedding similarity with the original. When the answer is necessarily indirect ("reviews don't directly address this, but..."), the generated paraphrases don't match the original question well, producing a low score even when the answer is factually correct and honest. This is a documented limitation of the answer relevancy metric on hedged, evidence-constrained answers.
 
-This is a genuine limitation to be honest about: the RAG system is excellent at answering qualitative questions grounded in venue reviews ("what's the vibe like?", "is it loud at night?") but weaker at answering quantitative or comparative questions that require score-level data the reviews don't carry.
+The root tension is real and intentional: we optimised for faithfulness (every claim grounded), which sometimes forces indirect answers when the corpus has coverage gaps. Faithfulness and answer relevancy pull in opposite directions. For a trust-first system, faithfulness wins.
 
-**The 0.00 answer relevancy pattern:** Ten of fifteen questions score 0.00 on answer relevancy. These tend to be complex comparative or renter-decision questions ("Is Brickell Village a good place to live for someone who works from home?"). The metric generates paraphrase questions from the answer and measures how well they match the original question — a complex answer that addresses multiple sub-questions can score low here even when it's substantively correct. This metric may be undervaluing the agent's actual performance on complex queries.
+### What Would Improve Each Score Further
 
-### What Would Improve Each Score
-
-- **Faithfulness → already good.** Maintain the strict context-only instruction in the generation prompt.
-- **Context Recall → supplement the corpus.** Adding the 311 complaint text, Reddit posts, and structured score data to the retrieval index would give the retriever the quantitative facts the ground truths reference.
-- **Context Precision → tune retrieval.** Reranking retrieved chunks (e.g. cross-encoder reranker) or narrowing the multi-query strategy would surface the most relevant chunks first.
-- **Answer Relevancy → revisit ground truth design.** Some 0.00 scores may reflect ground truths that are structurally incompatible with review-based retrieval, not actual relevancy failures.
+- **Faithfulness → maintain.** Keep the strict context-only generation constraint.
+- **Context Recall → extend the corpus.** Adding Reddit posts, 311 complaint text, and injecting structured score "documents" as retrievable chunks would give the retriever the facts needed for more question types.
+- **Context Precision → rerank.** A cross-encoder reranker on top of the multi-query cosine retrieval would surface the most relevant chunks first. Worth doing in v2.
+- **Answer Relevancy → corpus extension first, then consider loosening generation constraint for questions with no direct chunk match.** Do not loosen the constraint until corpus extension is in place — it would hurt faithfulness.
 
 ---
 

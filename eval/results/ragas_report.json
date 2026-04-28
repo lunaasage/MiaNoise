@@ -1,50 +1,50 @@
 {
-  "timestamp": "2026-04-27T22:48:54Z",
+  "timestamp": "2026-04-28T00:29:03Z",
   "aggregate": {
-    "faithfulness": 0.8467,
-    "answer_relevancy": 0.3207,
-    "context_precision": 0.3468,
-    "context_recall": 0.3222
+    "faithfulness": 0.8598,
+    "answer_relevancy": 0.4463,
+    "context_precision": 0.651,
+    "context_recall": 0.6122
   },
   "per_question": [
     {
       "neighborhood": "Wynwood Industrial District",
       "question": "Is Wynwood Industrial District loud at night?",
       "chunk_count": 6,
-      "faithfulness": 0.875,
-      "answer_relevancy": 0.9915,
-      "context_precision": 0.8042,
-      "context_recall": 1.0,
-      "answer_preview": "Yes, the Wynwood Industrial District can be quite loud at night. One review mentions that \"Oasis Wynwood\" is \"incredibly loud, way louder than music needs to be,\" which disturbs the local community. A\u2026"
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.9884,
+      "context_precision": 0.8056,
+      "context_recall": 0.6667,
+      "answer_preview": "Yes, Wynwood Industrial District can be quite loud at night. One review mentions that \"Oasis Wynwood\" is \"incredibly loud, way louder than music needs to be,\" which disturbs the local community. Anoth\u2026"
     },
     {
       "neighborhood": "Wynwood Industrial District",
       "question": "Is Wynwood Industrial District quieter during the day than at night?",
       "chunk_count": 7,
-      "faithfulness": 0.6,
-      "answer_relevancy": 0.9923,
-      "context_precision": 0.5889,
+      "faithfulness": 0.8,
+      "answer_relevancy": 0.991,
+      "context_precision": 0.3667,
       "context_recall": 1.0,
-      "answer_preview": "Yes, Wynwood Industrial District is generally quieter during the day compared to at night. One review mentions that \"the place is so relax during the day,\" indicating a calmer atmosphere. In contrast,\u2026"
+      "answer_preview": "Yes, Wynwood Industrial District tends to be quieter during the day. One review mentions that \"[Oasis Wynwood] is so relax during the day,\" indicating a more subdued atmosphere. In contrast, the same \u2026"
     },
     {
       "neighborhood": "CBD",
       "question": "How noisy is the CBD for someone considering living there?",
       "chunk_count": 9,
       "faithfulness": 1.0,
-      "answer_relevancy": 0.0,
-      "context_precision": 0.3333,
-      "context_recall": 0.0,
-      "answer_preview": "The CBD can be quite noisy, especially late at night. One review mentions loud music and people drinking on the sidewalk at 2:00 AM, indicating a disturbance for residents: \"If I could I would give yo\u2026"
+      "answer_relevancy": 0.9273,
+      "context_precision": 0.4778,
+      "context_recall": 0.25,
+      "answer_preview": "The CBD can be quite noisy, especially late at night. One review mentions loud music and people drinking on the sidewalk at 2:00 AM, indicating a lack of respect for residents: \"If I could I would giv\u2026"
     },
     {
       "neighborhood": "Brickell Village",
       "question": "What are the noise levels in Brickell Village on weekends?",
       "chunk_count": 12,
-      "faithfulness": 0.8889,
+      "faithfulness": 0.9,
       "answer_relevancy": 0.0,
-      "context_precision": 0.0,
-      "context_recall": 0.0,
+      "context_precision": 0.4035,
+      "context_recall": 0.75,
       "answer_preview": "The noise levels in Brickell Village on weekends can vary significantly depending on the venue. For instance, Blackbird Ordinary is described as \"one of the most fun late-night spots\" with a lively cr\u2026"
     },
     {
@@ -53,39 +53,39 @@
       "chunk_count": 10,
       "faithfulness": 1.0,
       "answer_relevancy": 0.0,
-      "context_precision": 0.6806,
-      "context_recall": 1.0,
-      "answer_preview": "The reviews do not provide specific information about the daytime noise levels in Brickell Village. However, one review mentions that \"the atmosphere felt completely flat\" at TuCandela Bar, which sugg\u2026"
+      "context_precision": 0.3333,
+      "context_recall": 0.25,
+      "answer_preview": "The reviews do not provide specific information about the daytime noise levels in Brickell Village. However, the nightlife scene is described as lively and energetic, with places like Blackbird Ordina\u2026"
     },
     {
       "neighborhood": "Wynwood Industrial District",
       "question": "What makes Wynwood Industrial District noisy \u2014 is it traffic or nightlife?",
       "chunk_count": 7,
-      "faithfulness": 0.8,
-      "answer_relevancy": 0.9334,
+      "faithfulness": 0.6,
+      "answer_relevancy": 0.9357,
       "context_precision": 1.0,
-      "context_recall": 0.5,
+      "context_recall": 0.6,
       "answer_preview": "The noise in the Wynwood Industrial District primarily stems from nightlife activities. One review mentions that Oasis Wynwood is \"incredibly loud, way louder than music needs to be,\" indicating that \u2026"
     },
     {
       "neighborhood": "Flagami",
       "question": "What types of noise are common in Flagami?",
       "chunk_count": 8,
-      "faithfulness": 0.5,
-      "answer_relevancy": 0.8926,
-      "context_precision": 0.0,
-      "context_recall": 0.0,
-      "answer_preview": "In Flagami, you can expect a lively atmosphere with music being a common source of noise. For instance, Happy Wine Calle Ocho features live music on weekends, creating a vibrant Spaniard-style ambianc\u2026"
+      "faithfulness": 0.6667,
+      "answer_relevancy": 0.9933,
+      "context_precision": 0.325,
+      "context_recall": 0.3333,
+      "answer_preview": "In Flagami, common types of noise include live music and vibrant atmospheres, particularly noted at places like Happy Wine Calle Ocho, where weekends come alive with live music and a warm vibe. Additi\u2026"
     },
     {
       "neighborhood": "Edgewater",
       "question": "Is Edgewater a quiet neighborhood compared to Wynwood?",
       "chunk_count": 7,
-      "faithfulness": 0.75,
+      "faithfulness": 1.0,
       "answer_relevancy": 0.0,
-      "context_precision": 0.0,
-      "context_recall": 0.0,
-      "answer_preview": "Based on the reviews, Edgewater does not seem to be a quiet neighborhood. For instance, Lagniappe is described as \"packed most of the time especially towards mid / late of the week,\" indicating a live\u2026"
+      "context_precision": 0.8056,
+      "context_recall": 0.6667,
+      "answer_preview": "Based on the reviews, Edgewater may not be considered a quiet neighborhood. For instance, Lagniappe is described as \"packed most of the time especially towards mid / late of the week\" and features \"li\u2026"
     },
     {
       "neighborhood": "East Little Havana",
@@ -93,28 +93,28 @@
       "chunk_count": 9,
       "faithfulness": 1.0,
       "answer_relevancy": 0.0,
-      "context_precision": 0.1667,
-      "context_recall": 0.3333,
+      "context_precision": 0.8767,
+      "context_recall": 0.6667,
       "answer_preview": "The noise situation in East Little Havana appears to be lively and vibrant, particularly in venues like Cafe La Trova and Odd Birds Miami, where there is fun and lively music, and events like the RUMB\u2026"
     },
     {
       "neighborhood": "Design District",
       "question": "Is the Design District noisy?",
       "chunk_count": 7,
-      "faithfulness": 0.7778,
+      "faithfulness": 0.7143,
       "answer_relevancy": 0.0,
-      "context_precision": 0.3333,
-      "context_recall": 0.0,
-      "answer_preview": "The reviews do not specifically mention noise levels in the Design District. However, one review describes The Stage as having \"eclectic crowd\" and playing \"mostly hip hop and house music,\" which sugg\u2026"
+      "context_precision": 0.5833,
+      "context_recall": 0.5,
+      "answer_preview": "The Design District has a mix of experiences regarding noise levels. For instance, The Stage is noted for its lively atmosphere with \"mostly hip hop and house music,\" which suggests a vibrant and pote\u2026"
     },
     {
       "neighborhood": "Midtown",
       "question": "Is Midtown Miami quiet enough for someone sensitive to noise?",
       "chunk_count": 10,
-      "faithfulness": 0.875,
+      "faithfulness": 0.75,
       "answer_relevancy": 0.0,
-      "context_precision": 0.0,
-      "context_recall": 0.0,
+      "context_precision": 0.4583,
+      "context_recall": 0.3333,
       "answer_preview": "Based on the reviews, Midtown Miami may not be the best choice for someone sensitive to noise. For instance, Peppi\u2019s Pizza is described as having a \"lively vibe\" with \"music playing on the speakers\" a\u2026"
     },
     {
@@ -123,19 +123,19 @@
       "chunk_count": 10,
       "faithfulness": 1.0,
       "answer_relevancy": 0.0,
-      "context_precision": 0.5683,
-      "context_recall": 0.6667,
-      "answer_preview": "Grove Center may not be the best choice for a noise-sensitive renter. One review mentions that Calista Cafe is \"not the quietest given the location\" and describes it as \"one of the noisiest, most unpl\u2026"
+      "context_precision": 0.975,
+      "context_recall": 0.75,
+      "answer_preview": "Grove Center may not be the best choice for a noise-sensitive renter. One review mentions that Calista Cafe is \"not the quietest given the location,\" and another review describes it as \"one of the noi\u2026"
     },
     {
       "neighborhood": "Brickell Village",
       "question": "Does noise from Brickell Village's nightlife persist late into the night?",
       "chunk_count": 10,
-      "faithfulness": 0.8333,
+      "faithfulness": 0.6667,
       "answer_relevancy": 1.0,
-      "context_precision": 0.3929,
-      "context_recall": 0.3333,
-      "answer_preview": "Yes, noise from Brickell Village's nightlife does persist late into the night. For instance, Blackbird Ordinary is described as a spot where \"the energy is always high\" and \"the atmosphere makes it ea\u2026"
+      "context_precision": 0.8762,
+      "context_recall": 1.0,
+      "answer_preview": "Yes, noise from Brickell Village's nightlife does persist late into the night. For instance, Blackbird Ordinary is described as a place where \"the energy is always high\" and \"the atmosphere makes it e\u2026"
     },
     {
       "neighborhood": "Allapattah Industrial District",
@@ -143,8 +143,8 @@
       "chunk_count": 4,
       "faithfulness": 0.8,
       "answer_relevancy": 0.0,
-      "context_precision": 0.0,
-      "context_recall": 0.0,
+      "context_precision": 1.0,
+      "context_recall": 0.6667,
       "answer_preview": "The reviews do not specifically mention noise levels in the Allapattah Industrial District. However, one review notes that the location is in a warehouse area with semi trucks trying to back in, which\u2026"
     },
     {
@@ -152,10 +152,10 @@
       "question": "Is there any time of day when the CBD is relatively quiet?",
       "chunk_count": 9,
       "faithfulness": 1.0,
-      "answer_relevancy": 0.0,
-      "context_precision": 0.3333,
-      "context_recall": 0.0,
-      "answer_preview": "Based on the reviews, the CBD does not seem to have a consistently quiet time. For instance, one review mentions loud music and drinking outside a restaurant at 2:00 AM on a Thursday, indicating late-\u2026"
+      "answer_relevancy": 0.8595,
+      "context_precision": 0.4778,
+      "context_recall": 0.75,
+      "answer_preview": "Based on the reviews, the CBD neighborhood can be quite noisy, especially late at night. For instance, one review mentions loud music and drinking on the sidewalk at 2:00 AM, indicating a lack of quie\u2026"
     }
   ]
 }
