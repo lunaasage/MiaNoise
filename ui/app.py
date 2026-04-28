@@ -115,6 +115,14 @@ def noise_label(score: float) -> str:
 def noise_badge(score: float) -> str:
     return {"Very Loud": "🔴", "Loud": "🟠", "Moderate": "🟡", "Quiet": "🟢"}[noise_label(score)]
 
+NOISE_RELEVANCE_KW = [
+    "loud", "noise", "noisy", "quiet", "sound", "music",
+    "crowd", "crowded", "packed", "busy", "lively", "energetic",
+    "blasting", "vibrat", "bass", "party", "club", "bar scene",
+    "rowdy", "chaotic", "peaceful", "serene", "atmosphere",
+    "volume", "speaker", "dj", "live music", "drunk", "bouncer",
+    "late night", "nightlife", "disturb", "sleep",
+]
 WEEKEND_NIGHT_KW = [
     "weekend", "friday", "saturday", "sunday",
     "night", "late night", "late at night", "midnight",
@@ -126,9 +134,16 @@ WEEKDAY_DAY_KW = [
     "lunch", "business hour",
 ]
 
+def is_noise_relevant(text: str) -> bool:
+    """Return True only if the review mentions noise/atmosphere signals."""
+    tl = text.lower()
+    return any(k in tl for k in NOISE_RELEVANCE_KW)
+
 def split_temporal(texts: list[str]) -> tuple[list[str], list[str]]:
     wn, wd = [], []
     for t in texts:
+        if not is_noise_relevant(t):
+            continue
         tl = t.lower()
         if any(k in tl for k in WEEKEND_NIGHT_KW):
             wn.append(t)
