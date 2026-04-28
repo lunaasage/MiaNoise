@@ -37,6 +37,20 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# ── Brand accents ───────────────────────────────────────────────────────────────
+# Gradient band: cyan→coral, 5px, pinned to top content edge (brand book §05)
+st.markdown("""
+<style>
+  .block-container { padding-top: 0.75rem !important; }
+</style>
+<div style="
+    height: 5px;
+    background: linear-gradient(90deg, #00CEC9 0%, #FF4F44 100%);
+    width: 100%;
+    margin-bottom: 12px;
+"></div>
+""", unsafe_allow_html=True)
+
 # ── Cached loaders ─────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600)
@@ -115,7 +129,37 @@ def noise_badge(score: float) -> str:
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
-st.image(str(Path(__file__).parent / "logo.png"), width=320)
+st.image(str(Path(__file__).parent / "logo.png"), width=300)
+
+# Waveform accent — sine wave + EKG spike, cyan→coral gradient (brand book §05)
+st.markdown("""
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="36"
+     viewBox="0 0 1400 36" preserveAspectRatio="none"
+     style="display:block; margin: -4px 0 12px 0;">
+  <defs>
+    <linearGradient id="wg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#00CEC9"/>
+      <stop offset="100%" stop-color="#FF4F44"/>
+    </linearGradient>
+  </defs>
+  <path fill="none" stroke="url(#wg)" stroke-width="2" opacity="0.55"
+    d="M0,18
+       C 25,18 37,6  50,6  C 63,6  75,18 100,18
+       C125,18 137,30 150,30 C163,30 175,18 200,18
+       C225,18 237,6  250,6  C263,6  275,18 300,18
+       C325,18 337,30 350,30 C363,30 375,18 400,18
+       C425,18 437,6  450,6  C463,6  475,18 500,18
+       C525,18 537,30 550,30 C563,30 575,18 600,18
+       L 625,18 L 638,2 L 648,34 L 658,18 L 680,18
+       C705,18 717,6  730,6  C743,6  755,18 780,18
+       C805,18 817,30 830,30 C843,30 855,18 880,18
+       C905,18 917,6  930,6  C943,6  955,18 980,18
+       C1005,18 1017,30 1030,30 C1043,30 1055,18 1080,18
+       C1105,18 1117,6  1130,6  C1143,6  1155,18 1180,18
+       C1205,18 1217,30 1230,30 C1243,30 1255,18 1280,18
+       C1305,18 1317,6  1330,6  C1343,6  1355,18 1380,18 L1400,18"/>
+</svg>
+""", unsafe_allow_html=True)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 
