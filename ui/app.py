@@ -25,7 +25,6 @@ from ingestion.db import (
     load_neighborhood_geodataframe,
     load_profile,
     load_all_profiles,
-    load_neighborhood_reviews,
 )
 from ui.map_builder import build_map
 from agent.executor import get_agent, ask
@@ -56,9 +55,6 @@ def _profile(name: str):
 def _all_profiles():
     return load_all_profiles()
 
-@st.cache_data(ttl=3600)
-def _reviews(name: str):
-    return load_neighborhood_reviews(name)
 
 @st.cache_resource
 def _agent():
@@ -115,44 +111,6 @@ def noise_label(score: float) -> str:
 def noise_badge(score: float) -> str:
     return {"Very Loud": "🔴", "Loud": "🟠", "Moderate": "🟡", "Quiet": "🟢"}[noise_label(score)]
 
-NOISE_RELEVANCE_KW = [
-    # Explicit noise language
-    "loud", "noisy", "noise", "too loud", "so loud", "very loud",
-    "blasting", "deafening", "vibrat",
-    # Quietness / renter-relevant
-    "quiet", "peaceful", "disturb", "sleep",
-    # Venue-type signals that imply a noise environment
-    "dj", "live music", "nightlife", "bouncer", "nightclub",
-    # Volume / sound equipment
-    "volume", "speaker", "rowdy",
-]
-WEEKEND_NIGHT_KW = [
-    "weekend", "friday", "saturday", "sunday",
-    "night", "late night", "late at night", "midnight",
-    "1am", "2am", "3am", "4am", "evening", "after dark",
-]
-WEEKDAY_DAY_KW = [
-    "weekday", "monday", "tuesday", "wednesday", "thursday",
-    "morning", "daytime", "during the day", "afternoon",
-    "lunch", "business hour",
-]
-
-def is_noise_relevant(text: str) -> bool:
-    """Return True only if the review mentions noise/atmosphere signals."""
-    tl = text.lower()
-    return any(k in tl for k in NOISE_RELEVANCE_KW)
-
-def split_temporal(texts: list[str]) -> tuple[list[str], list[str]]:
-    wn, wd = [], []
-    for t in texts:
-        if not is_noise_relevant(t):
-            continue
-        tl = t.lower()
-        if any(k in tl for k in WEEKEND_NIGHT_KW):
-            wn.append(t)
-        if any(k in tl for k in WEEKDAY_DAY_KW):
-            wd.append(t)
-    return wn, wd
 
 
 # ── Header ─────────────────────────────────────────────────────────────────────
@@ -321,62 +279,27 @@ with tab_compare:
                 else:
                     st.info("No profile available.")
 
-        # ── Temporal patterns ──────────────────────────────────────────────
+        # ── Full-version placeholders ──────────────────────────────────────
         st.divider()
-        st.markdown("#### Temporal Patterns")
-        st.caption(
-            "Reviews classified by time-of-day and day-of-week keywords found in review text. "
-            "Full hourly and weekday vs. weekend time-series charts will appear here once "
-            "time-stamped complaint data and hourly traffic data are available in the production version."
+        st.markdown("#### Temporal Patterns — Full Version")
+        st.info(
+            "**Coming in the full version.** "
+            "Once we integrate time-stamped data sources, this section will show side-by-side:\n\n"
+            "- **Weekday vs. weekend noise score** — avg. composite score Mon–Thu vs. Fri–Sun\n"
+            "- **Hour-of-day breakdown** — peak noise windows per neighborhood (requires TomTom hourly traffic + 311 complaint timestamps)\n"
+            "- **Complaint frequency heatmap** — day × hour grid for each neighborhood\n\n"
+            "_Data sources required: TomTom Traffic API (hourly), City of Miami 311 with timestamp resolution, construction permit dates._"
         )
 
-        with st.spinner("Loading reviews…"):
-            rev_a = _reviews(nbhd_a)
-            rev_b = _reviews(nbhd_b)
-
-        wn_a, wd_a = split_temporal(rev_a)
-        wn_b, wd_b = split_temporal(rev_b)
-
-        temp_a, temp_b = st.columns(2)
-
-        for col, name, wn, wd, total in [
-            (temp_a, nbhd_a, wn_a, wd_a, len(rev_a)),
-            (temp_b, nbhd_b, wn_b, wd_b, len(rev_b)),
-        ]:
-            with col:
-                st.markdown(f"**{name}**")
-                st.caption(f"{total} reviews total")
-
-                st.markdown("**Weekend / Night mentions**")
-                if wn:
-                    st.metric("Reviews", len(wn), help="Reviews mentioning weekends or nighttime")
-                    for excerpt in wn[:3]:
-                        st.markdown(
-                            f"> _{excerpt[:220]}{'…' if len(excerpt) > 220 else ''}_"
-                        )
-                else:
-                    st.caption("No weekend/night mentions found in reviews.")
-
-                st.markdown("**Weekday / Daytime mentions**")
-                if wd:
-                    st.metric("Reviews", len(wd), help="Reviews mentioning weekdays or daytime")
-                    for excerpt in wd[:3]:
-                        st.markdown(
-                            f"> _{excerpt[:220]}{'…' if len(excerpt) > 220 else ''}_"
-                        )
-                else:
-                    st.caption("No weekday/daytime mentions found in reviews.")
-
-        # Placeholder for production charts
-        with st.expander("Hourly & daily noise charts — coming in production version"):
-            st.info(
-                "Once the full version integrates hourly traffic data (TomTom), construction "
-                "permits, and time-stamped 311 complaint data, this section will show:\n\n"
-                "- Average noise score by hour of day (Mon–Fri vs. Sat–Sun)\n"
-                "- Complaint frequency heatmap by day and time\n"
-                "- ML-identified peak noise windows per neighborhood\n"
-                "- Block-level granularity once tract/block-level data is available"
-            )
+        st.divider()
+        st.markdown("#### Block-Level Granularity — Full Version")
+        st.info(
+            "**Coming in the full version.** "
+            "Current scores are at the neighborhood polygon level. "
+            "Block-level scoring will break each neighborhood into census tracts or city blocks, "
+            "letting renters compare a quiet block inside a loud neighborhood vs. a loud block inside a quieter one.\n\n"
+            "_Requires: TomTom segment-level traffic, block-level 311 complaint mapping, OSM building footprints._"
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
