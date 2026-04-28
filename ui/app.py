@@ -18,7 +18,6 @@ load_dotenv(find_dotenv(usecwd=False), override=True)
 
 import streamlit as st
 from streamlit_folium import st_folium
-from shapely.geometry import Point
 
 from ingestion.db import (
     load_latest_scores,
@@ -180,14 +179,19 @@ with tab_map:
 
     with col_map:
         m = build_map(gdf)
-        map_data = st_folium(m, use_container_width=True, height=540)
+        map_data = st_folium(
+            m,
+            use_container_width=True,
+            height=540,
+            returned_objects=["last_object_clicked"],
+        )
 
-        clicked = map_data.get("last_clicked") if map_data else None
-        if clicked:
-            pt = Point(clicked["lng"], clicked["lat"])
-            matches = gdf[gdf.geometry.contains(pt)]
-            if not matches.empty:
-                st.session_state.selected = matches.iloc[0]["name"]
+        obj = (map_data or {}).get("last_object_clicked")
+        if obj and isinstance(obj, dict):
+            name = obj.get("name")
+            if name and name != st.session_state.selected:
+                st.session_state.selected = name
+                st.rerun()
 
     with col_info:
         selected = st.session_state.selected
