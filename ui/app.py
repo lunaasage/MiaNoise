@@ -116,12 +116,15 @@ def noise_badge(score: float) -> str:
     return {"Very Loud": "🔴", "Loud": "🟠", "Moderate": "🟡", "Quiet": "🟢"}[noise_label(score)]
 
 NOISE_RELEVANCE_KW = [
-    "loud", "noise", "noisy", "quiet", "sound", "music",
-    "crowd", "crowded", "packed", "busy", "lively", "energetic",
-    "blasting", "vibrat", "bass", "party", "club", "bar scene",
-    "rowdy", "chaotic", "peaceful", "serene", "atmosphere",
-    "volume", "speaker", "dj", "live music", "drunk", "bouncer",
-    "late night", "nightlife", "disturb", "sleep",
+    # Explicit noise language
+    "loud", "noisy", "noise", "too loud", "so loud", "very loud",
+    "blasting", "deafening", "vibrat",
+    # Quietness / renter-relevant
+    "quiet", "peaceful", "disturb", "sleep",
+    # Venue-type signals that imply a noise environment
+    "dj", "live music", "nightlife", "bouncer", "nightclub",
+    # Volume / sound equipment
+    "volume", "speaker", "rowdy",
 ]
 WEEKEND_NIGHT_KW = [
     "weekend", "friday", "saturday", "sunday",
