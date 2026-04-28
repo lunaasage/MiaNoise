@@ -118,3 +118,22 @@ Read this at the start of every session. Update after every correction or unexpe
 **What happened:** The generation prompt instructs GPT-4o-mini to ground every claim in retrieved chunks ("every claim you make must be directly supported by a review excerpt"). This maximizes faithfulness (0.847) but causes indirect, hedged answers for questions the corpus doesn't directly cover ("reviews don't specifically address this, but..."). RAGAS answer_relevancy measures whether the answer directly addresses the question — hedged answers score low even when factually correct.
 **Lesson:** For a trust-first RAG system, this tradeoff is intentional and correct. Faithfulness is the primary contract with the user. Answer relevancy being lower is an honest signal that the corpus has coverage gaps, not that the system is broken. The right fix is to extend the corpus (more review sources, Reddit posts, structured score documents), not to loosen the generation constraint.
 **Rule:** When evaluating a constrained RAG system, lead with faithfulness as the primary metric. Lower answer_relevancy should trigger corpus extension, not prompt relaxation.
+
+---
+
+## Sprint 4 — Streamlit Cloud Deployment
+
+### L20 — Streamlit Cloud uses `runtime.txt` for Python version and `packages.txt` for apt packages
+**What happened:** App was failing to deploy — Streamlit Cloud defaulted to Python 3.14 (experimental) despite a `.python-version` file specifying 3.11. `fiona` (geopandas dependency) requires GDAL C libraries not present in the default build image.
+**Lesson:** Streamlit Cloud has two separate mechanisms: `runtime.txt` in the repo root for Python version (format: `python-3.12`), and `packages.txt` for apt system packages (one package per line, e.g. `libgdal-dev`, `gdal-bin`). `.python-version` is a pyenv convention not read by Streamlit Cloud.
+**Rule:** For any Streamlit Cloud deployment with geospatial dependencies: `packages.txt` must include `libgdal-dev` and `gdal-bin`; `runtime.txt` must pin a stable Python version (3.11 or 3.12).
+
+### L21 — `langchain.agents.create_agent` does not exist; use `langgraph.prebuilt.create_react_agent`
+**What happened:** Streamlit Cloud deployment failed at import time with `ImportError: cannot import name 'create_agent' from 'langchain.agents'`. The function used during local development (`create_agent` with `system_prompt=`) was never a public LangChain API — it was a LangGraph internal that happened to be importable locally due to dev install paths.
+**Lesson:** The correct public API is `from langgraph.prebuilt import create_react_agent`, using `state_modifier=` instead of `system_prompt=`. Also requires `langgraph` as an explicit `requirements.txt` entry (it's not pulled in transitively by `langchain`).
+**Rule:** When using LangGraph agent primitives, always import from `langgraph.prebuilt`, never from `langchain.agents`. Verify imports against the installed package, not just local behavior.
+
+### L22 — `setuptools<82.0.0` required to build geospatial packages from source on Streamlit Cloud
+**What happened:** `pandas==2.2.2` failed to build from source on Streamlit Cloud because newer `setuptools` removed `pkg_resources` from the default namespace, which `pandas`'s build backend depends on.
+**Lesson:** Pin `setuptools<82.0.0` at the top of `requirements.txt` whenever the dependency set includes packages that build from source (geopandas, pandas, fiona). This is a build-time constraint, not a runtime one.
+**Rule:** Any requirements.txt that includes geospatial or numeric packages that may build from source should pin `setuptools<82.0.0` as the first entry.

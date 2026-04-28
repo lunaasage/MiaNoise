@@ -237,6 +237,10 @@ This is the record of *why* the codebase looks the way it does. Never silently r
 | Apr 24, 2026 | 3.4 | `ui/map_builder.py` — colormap vmax fix | Hardcoded vmax=1.0 compressed all scores into green-yellow range since max is 0.70. Fixed: vmax=actual max score in data, green→red now spans real distribution. |
 | Apr 24, 2026 | 3.4 | `ui/app.py` — chat message display fix | User message and agent response appeared simultaneously after generation. Fixed: append user message + rerun immediately on submit; render history first, then spinner below; generate response; rerun. |
 | Apr 24, 2026 | 3.4 | `requirements.txt` + `.python-version` — Streamlit Cloud deploy fix | psycopg2-binary not imported anywhere; removed. Python 3.14 has no pre-built wheel for it. Pinned Python 3.11 via `.python-version`. |
+| Apr 27, 2026 | 4 | `packages.txt` — GDAL system libs for Streamlit Cloud | `fiona` build failed: no `gdal-config` on default build image. Added `libgdal-dev`, `gdal-bin`, `libgeos-dev` to packages.txt (apt-installed before pip). |
+| Apr 27, 2026 | 4 | `runtime.txt` — Python version pin for Streamlit Cloud | Streamlit Cloud reads `runtime.txt`, not `.python-version` (pyenv convention). Pinned `python-3.11`. |
+| Apr 28, 2026 | 4 | `agent/agent.py` — `create_agent` → `create_react_agent` | `langchain.agents.create_agent` doesn't exist as a public API; deployment failed at import. Correct: `from langgraph.prebuilt import create_react_agent`, `state_modifier=` instead of `system_prompt=`. |
+| Apr 28, 2026 | 4 | `requirements.txt` — add `langgraph`, `setuptools<82.0.0` | `langgraph` not pulled in transitively by `langchain`; must be explicit. `setuptools<82.0.0` required so `pandas` build-from-source finds `pkg_resources`. |
 
 ---
 
