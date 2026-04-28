@@ -20,7 +20,7 @@ Entry point:
 import logging
 import os
 
-from langchain.agents import create_agent
+from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
@@ -98,7 +98,7 @@ def get_agent():
         api_key=os.environ["OPENAI_API_KEY"],
         temperature=0.2,
     )
-    return create_agent(llm, tools=TOOLS, system_prompt=SYSTEM_PROMPT, debug=False)
+    return create_react_agent(llm, tools=TOOLS, state_modifier=SYSTEM_PROMPT, debug=False)
 
 
 def ask(agent, user_input: str, history: list) -> tuple[str, list]:
