@@ -518,7 +518,8 @@ with tab_chat:
         prompt = user_input.strip()
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.session_state.pending_prompt = prompt
-        st.rerun()  # rerun immediately so user message renders before generation starts
+        # No st.rerun() — clear_on_submit=True already clears the input,
+        # and we fall through to the rendering section in this same execution
 
     # Messages below the input box
     st.markdown(
@@ -536,21 +537,20 @@ with tab_chat:
     else:
         if st.session_state.pending_prompt:
             pending = st.session_state.pending_prompt
-            # Thinking at top — that's where the agent response will land in newest-at-top layout
-            st.markdown(_THINKING_HTML, unsafe_allow_html=True)
-            # Latest user message directly below thinking
+            # st.empty() lets us replace the thinking indicator with the real response
+            # in-place when ask() returns — no rerun, no flash
+            thinking_slot = st.empty()
+            thinking_slot.markdown(_THINKING_HTML, unsafe_allow_html=True)
             st.markdown(_chat_bubble("user", st.session_state.messages[-1]["content"]), unsafe_allow_html=True)
-            # Older history below
             for msg in reversed(st.session_state.messages[:-1]):
                 st.markdown(_chat_bubble(msg["role"], msg["content"]), unsafe_allow_html=True)
             agent = _agent()
             response, updated_history = ask(agent, pending, st.session_state.agent_history)
-            # Clear pending_prompt only after ask() returns — prevents silent drop on disconnect
+            # Swap thinking → response in-place; no rerun needed
+            thinking_slot.markdown(_chat_bubble("assistant", response), unsafe_allow_html=True)
             st.session_state.pending_prompt = None
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.session_state.agent_history = updated_history
-            st.rerun()
         else:
-            # No pending — render full history, newest at top
             for msg in reversed(st.session_state.messages):
                 st.markdown(_chat_bubble(msg["role"], msg["content"]), unsafe_allow_html=True)
