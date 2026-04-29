@@ -133,6 +133,18 @@ st.markdown("""
   /* ── Selectbox / text inputs ── */
   [data-baseweb="select"] * { font-family: 'Inter', sans-serif !important; }
   [data-testid="stTextInput"] input { color: #EDE8D8 !important; }
+
+  /* ── Thinking spinner ── */
+  @keyframes mia-spin { to { transform: rotate(360deg); } }
+  .mia-spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(136,146,164,0.25);
+    border-top-color: #00CEC9;
+    border-radius: 50%;
+    animation: mia-spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
 </style>
 <div style="
     height: 5px;
@@ -476,14 +488,10 @@ def _chat_bubble(role: str, content: str) -> str:
     )
 
 _THINKING_HTML = (
-    '<div style="display:flex;flex-direction:column;align-items:flex-start;margin-bottom:8px;">'
-    '<div style="padding:10px 14px;'
-    'background:rgba(22,40,68,0.6);'
-    'border-radius:8px 8px 8px 2px;'
-    'border-left:2px solid #00CEC9;">'
-    '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;'
-    'color:#8892A4;text-transform:uppercase;letter-spacing:.08em;">Thinking…</div>'
-    '</div></div>'
+    '<div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px 0;">'
+    '<div class="mia-spinner"></div>'
+    '<span style="font-family:\'Inter\',sans-serif;font-size:13px;color:#8892A4;">Thinking…</span>'
+    '</div>'
 )
 
 with tab_chat:
@@ -526,19 +534,22 @@ with tab_chat:
             unsafe_allow_html=True,
         )
     else:
-        # Generate response if one is pending — pending_prompt cleared AFTER ask() returns
         if st.session_state.pending_prompt:
             pending = st.session_state.pending_prompt
+            # Render latest user message at top, thinking below it, then older history —
+            # all three renders happen before ask() blocks so they're visible while waiting
+            st.markdown(_chat_bubble("user", st.session_state.messages[-1]["content"]), unsafe_allow_html=True)
             st.markdown(_THINKING_HTML, unsafe_allow_html=True)
+            for msg in reversed(st.session_state.messages[:-1]):
+                st.markdown(_chat_bubble(msg["role"], msg["content"]), unsafe_allow_html=True)
             agent = _agent()
             response, updated_history = ask(agent, pending, st.session_state.agent_history)
-            # Only clear pending_prompt once we have the response — prevents silent drop
-            # if the connection is interrupted mid-generation
+            # Clear pending_prompt only after ask() returns — prevents silent drop on disconnect
             st.session_state.pending_prompt = None
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.session_state.agent_history = updated_history
             st.rerun()
-
-        # Render conversation history — newest message at top
-        for msg in reversed(st.session_state.messages):
-            st.markdown(_chat_bubble(msg["role"], msg["content"]), unsafe_allow_html=True)
+        else:
+            # No pending — render full history, newest at top
+            for msg in reversed(st.session_state.messages):
+                st.markdown(_chat_bubble(msg["role"], msg["content"]), unsafe_allow_html=True)
