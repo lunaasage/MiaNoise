@@ -37,11 +37,102 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ── Brand accents ───────────────────────────────────────────────────────────────
-# Gradient band: cyan→coral, 5px, pinned to top content edge (brand book §05)
+# ── Brand styles ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
+  /* ── Fonts ── */
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  /* ── Global typography ── */
+  html, body, .stApp, .stApp * { font-family: 'Inter', sans-serif; }
+  .stApp h1, .stApp h2, .stApp h3,
+  .stApp .stSubheader, [data-testid="stHeadingWithActionElements"] * {
+    font-family: 'Space Grotesk', sans-serif !important;
+    color: #EDE8D8 !important;
+  }
+
+  /* ── App chrome ── */
   .block-container { padding-top: 0.75rem !important; }
+  hr { border-color: rgba(255,255,255,0.08) !important; }
+  .stCaption, [data-testid="stCaptionContainer"] { color: #8892A4 !important; }
+
+  /* ── Tabs ── */
+  [data-baseweb="tab-list"] { border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
+  [data-baseweb="tab"] {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    color: #8892A4 !important;
+    background: transparent !important;
+  }
+  [data-baseweb="tab"][aria-selected="true"] {
+    color: #00CEC9 !important;
+    border-bottom: 2px solid #00CEC9 !important;
+  }
+  [data-baseweb="tab-highlight"] { background: #00CEC9 !important; }
+
+  /* ── Score metrics (JetBrains Mono) ── */
+  [data-testid="stMetricValue"] {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 700 !important;
+  }
+
+  /* ── Buttons ── */
+  .stButton > button {
+    font-family: 'Inter', sans-serif !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    background: rgba(255,255,255,0.04) !important;
+    color: #EDE8D8 !important;
+  }
+  .stButton > button:hover {
+    border-color: #00CEC9 !important;
+    color: #00CEC9 !important;
+    background: rgba(0,206,201,0.06) !important;
+  }
+
+  /* ── Chat: form send button ── */
+  .stFormSubmitButton > button {
+    background: #FF4F44 !important;
+    border: none !important;
+    color: #fff !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+  }
+  .stFormSubmitButton > button:hover {
+    background: #CC3F35 !important;
+    border: none !important;
+    color: #fff !important;
+  }
+
+  /* ── Chat: text input ── */
+  [data-testid="stChatTab"] .stTextInput > div > div > input,
+  .chat-input-area .stTextInput > div > div > input,
+  section[data-testid="stForm"] input[type="text"] {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #EDE8D8 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    border-radius: 6px !important;
+  }
+  section[data-testid="stForm"] input[type="text"]:focus {
+    border-color: #00CEC9 !important;
+    box-shadow: 0 0 0 1px #00CEC9 !important;
+  }
+
+  /* ── Expanders ── */
+  [data-testid="stExpander"] summary {
+    font-family: 'Inter', sans-serif !important;
+    color: #EDE8D8 !important;
+  }
+  [data-testid="stExpander"] {
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+  }
+
+  /* ── Selectbox / text inputs ── */
+  [data-baseweb="select"] * { font-family: 'Inter', sans-serif !important; }
+  [data-testid="stTextInput"] input { color: #EDE8D8 !important; }
 </style>
 <div style="
     height: 5px;
@@ -349,6 +440,52 @@ with tab_compare:
 # TAB 4 — CHAT WITH MIANOISE
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _chat_bubble(role: str, content: str) -> str:
+    """Render a branded chat message bubble as HTML."""
+    import re
+    # Convert **bold** to <strong> with cream color
+    html_body = re.sub(
+        r'\*\*(.+?)\*\*',
+        r'<strong style="color:#EDE8D8">\1</strong>',
+        content,
+    )
+    html_body = html_body.replace("\n", "<br>")
+
+    if role == "user":
+        return (
+            '<div style="display:flex;flex-direction:column;align-items:flex-end;margin-bottom:8px;">'
+            '<div style="max-width:75%;padding:10px 14px;'
+            'background:rgba(255,79,68,0.12);'
+            'border-radius:8px 8px 2px 8px;'
+            'border-right:2px solid #FF4F44;">'
+            '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;'
+            'color:#8892A4;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">You</div>'
+            f'<div style="font-family:\'Inter\',sans-serif;font-size:13px;line-height:21px;color:#EDE8D8;">{html_body}</div>'
+            '</div></div>'
+        )
+    return (
+        '<div style="display:flex;flex-direction:column;align-items:flex-start;margin-bottom:8px;">'
+        '<div style="max-width:75%;padding:10px 14px;'
+        'background:rgba(22,40,68,0.8);'
+        'border-radius:8px 8px 8px 2px;'
+        'border-left:2px solid #00CEC9;">'
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;'
+        'color:#8892A4;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">MiaNoise</div>'
+        f'<div style="font-family:\'Inter\',sans-serif;font-size:13px;line-height:21px;color:#8892A4;">{html_body}</div>'
+        '</div></div>'
+    )
+
+_THINKING_HTML = (
+    '<div style="display:flex;flex-direction:column;align-items:flex-start;margin-bottom:8px;">'
+    '<div style="padding:10px 14px;'
+    'background:rgba(22,40,68,0.6);'
+    'border-radius:8px 8px 8px 2px;'
+    'border-left:2px solid #00CEC9;">'
+    '<div style="font-family:\'JetBrains Mono\',monospace;font-size:10px;'
+    'color:#8892A4;text-transform:uppercase;letter-spacing:.08em;">Thinking…</div>'
+    '</div></div>'
+)
+
 with tab_chat:
     st.subheader("Chat with MiaNoise")
     st.caption(
@@ -376,25 +513,32 @@ with tab_chat:
         st.rerun()  # rerun immediately so user message renders before generation starts
 
     # Messages below the input box
-    st.divider()
-    if not st.session_state.messages and not st.session_state.pending_prompt:
-        st.caption("Your conversation will appear here.")
-    else:
-        # Render history first (reversed = newest at top) so user message is always visible
-        for msg in reversed(st.session_state.messages):
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+    st.markdown(
+        '<div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 0 12px;"></div>',
+        unsafe_allow_html=True,
+    )
 
-        # Then generate response below the user message
+    if not st.session_state.messages and not st.session_state.pending_prompt:
+        st.markdown(
+            '<p style="font-family:Inter,sans-serif;font-size:12px;'
+            'color:#8892A4;text-align:center;padding:32px 0;">'
+            'Your conversation will appear here.</p>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # Generate response if one is pending — pending_prompt cleared AFTER ask() returns
         if st.session_state.pending_prompt:
             pending = st.session_state.pending_prompt
+            st.markdown(_THINKING_HTML, unsafe_allow_html=True)
+            agent = _agent()
+            response, updated_history = ask(agent, pending, st.session_state.agent_history)
+            # Only clear pending_prompt once we have the response — prevents silent drop
+            # if the connection is interrupted mid-generation
             st.session_state.pending_prompt = None
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking…"):
-                    agent = _agent()
-                    response, updated_history = ask(
-                        agent, pending, st.session_state.agent_history
-                    )
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.session_state.agent_history = updated_history
             st.rerun()
+
+        # Render conversation history — newest message at top
+        for msg in reversed(st.session_state.messages):
+            st.markdown(_chat_bubble(msg["role"], msg["content"]), unsafe_allow_html=True)

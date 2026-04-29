@@ -31,7 +31,7 @@ def build_map(gdf: gpd.GeoDataFrame) -> folium.Map:
     m = folium.Map(
         location=MIAMI_CENTER,
         zoom_start=ZOOM_START,
-        tiles="CartoDB positron",
+        tiles="CartoDB dark_matter",
     )
 
     plot = gdf.copy()
