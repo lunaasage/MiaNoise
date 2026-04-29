@@ -29,7 +29,7 @@ requests==2.32.3
 
 # Frontend
 streamlit==1.36.0
-streamlit-folium==0.20.0
+streamlit-folium==0.27.1
 pydeck==0.9.1
 
 # Evaluation
