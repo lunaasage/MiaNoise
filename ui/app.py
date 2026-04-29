@@ -536,10 +536,11 @@ with tab_chat:
     else:
         if st.session_state.pending_prompt:
             pending = st.session_state.pending_prompt
-            # Render latest user message at top, thinking below it, then older history —
-            # all three renders happen before ask() blocks so they're visible while waiting
-            st.markdown(_chat_bubble("user", st.session_state.messages[-1]["content"]), unsafe_allow_html=True)
+            # Thinking at top — that's where the agent response will land in newest-at-top layout
             st.markdown(_THINKING_HTML, unsafe_allow_html=True)
+            # Latest user message directly below thinking
+            st.markdown(_chat_bubble("user", st.session_state.messages[-1]["content"]), unsafe_allow_html=True)
+            # Older history below
             for msg in reversed(st.session_state.messages[:-1]):
                 st.markdown(_chat_bubble(msg["role"], msg["content"]), unsafe_allow_html=True)
             agent = _agent()
