@@ -180,31 +180,14 @@ with tab_map:
 
     with col_map:
         m = build_map(gdf)
-        map_data = st_folium(
-            m,
-            use_container_width=True,
-            height=540,
-            returned_objects=["last_object_clicked", "last_clicked"],
-        )
+        map_data = st_folium(m, use_container_width=True, height=540, key="main_map")
 
-        name = None
-        if map_data:
-            # Primary: feature properties from GeoJSON click
-            obj = map_data.get("last_object_clicked") or {}
-            name = obj.get("name") or (obj.get("properties") or {}).get("name")
-
-            # Fallback: raw coordinates → point-in-polygon
-            if not name:
-                clicked = map_data.get("last_clicked")
-                if clicked:
-                    pt = Point(clicked["lng"], clicked["lat"])
-                    matches = gdf[gdf.geometry.contains(pt)]
-                    if not matches.empty:
-                        name = matches.iloc[0]["name"]
-
-        if name and name != st.session_state.selected:
-            st.session_state.selected = name
-            st.rerun()
+        clicked = map_data.get("last_clicked") if map_data else None
+        if clicked:
+            pt = Point(clicked["lng"], clicked["lat"])
+            matches = gdf[gdf.geometry.contains(pt)]
+            if not matches.empty:
+                st.session_state.selected = matches.iloc[0]["name"]
 
     with col_info:
         selected = st.session_state.selected
