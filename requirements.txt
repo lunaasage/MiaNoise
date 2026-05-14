@@ -1,0 +1,40 @@
+# Core
+setuptools<82.0.0
+python-dotenv==1.0.1
+pandas==2.2.2
+numpy==1.26.4
+
+# Geospatial
+geopandas==0.14.4
+shapely==2.0.4
+folium==0.17.0
+
+# Database
+supabase==2.5.0
+pgvector==0.3.2
+
+# LLM / RAG
+anthropic==0.28.0
+openai==1.35.0
+langchain==0.2.6
+langchain-anthropic==0.1.19
+langchain-openai==0.1.14
+langchain-groq
+langchain-community==0.2.6
+langgraph
+
+# Data sources
+praw==7.7.1
+requests==2.32.3
+
+# Frontend
+streamlit==1.36.0
+streamlit-folium==0.27.1
+pydeck==0.9.1
+
+# Evaluation
+ragas>=0.2,<0.3
+
+# Dev
+pytest==8.2.2
+pytest-asyncio==0.23.7
